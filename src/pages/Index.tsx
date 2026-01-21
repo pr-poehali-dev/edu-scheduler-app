@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Progress } from '@/components/ui/progress';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+
 import Icon from '@/components/ui/icon';
 
 const Index = () => {
@@ -51,11 +51,9 @@ const Index = () => {
                 <Icon name="Bell" size={20} />
                 <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full animate-pulse"></span>
               </Button>
-              <Avatar>
-                <AvatarFallback className="bg-gradient-to-br from-purple-600 to-purple-800 text-white">
-                  ИИ
-                </AvatarFallback>
-              </Avatar>
+              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-600 to-purple-800 flex items-center justify-center text-white font-semibold">
+                ИИ
+              </div>
             </div>
           </div>
         </div>
@@ -272,11 +270,9 @@ const Index = () => {
           <TabsContent value="profile" className="space-y-6 animate-fade-in">
             <Card className="p-6">
               <div className="flex items-center gap-6 mb-6">
-                <Avatar className="w-24 h-24">
-                  <AvatarFallback className="bg-gradient-to-br from-purple-600 to-purple-800 text-white text-2xl">
-                    ИИ
-                  </AvatarFallback>
-                </Avatar>
+                <div className="w-24 h-24 rounded-full bg-gradient-to-br from-purple-600 to-purple-800 flex items-center justify-center text-white text-2xl font-bold">
+                  ИИ
+                </div>
                 <div>
                   <h2 className="text-2xl font-heading font-bold text-gray-900">Иван Иванов</h2>
                   <p className="text-gray-600">ivan.ivanov@university.ru</p>
