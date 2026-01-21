@@ -1,4 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { authService } from '@/lib/auth';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -8,7 +10,30 @@ import { Progress } from '@/components/ui/progress';
 import Icon from '@/components/ui/icon';
 
 const Index = () => {
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('schedule');
+  const [user, setUser] = useState(authService.getUser());
+
+  useEffect(() => {
+    const checkAuth = async () => {
+      if (!authService.isAuthenticated()) {
+        navigate('/login');
+        return;
+      }
+      const verifiedUser = await authService.verifyToken();
+      if (!verifiedUser) {
+        navigate('/login');
+      } else {
+        setUser(verifiedUser);
+      }
+    };
+    checkAuth();
+  }, [navigate]);
+
+  const handleLogout = () => {
+    authService.logout();
+    navigate('/login');
+  };
 
   const schedule = [
     { id: 1, subject: 'Математический анализ', time: '09:00 - 10:30', room: 'ауд. 301', type: 'lecture', color: 'bg-purple-500' },
@@ -57,9 +82,14 @@ const Index = () => {
                 <Icon name="Bell" size={20} className="text-purple-600" />
                 <span className="absolute top-2 right-2 w-2 h-2 bg-gradient-to-br from-pink-500 to-rose-500 rounded-full animate-pulse shadow-lg shadow-pink-500/50"></span>
               </Button>
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-600 via-purple-600 to-pink-600 flex items-center justify-center text-white font-bold text-sm shadow-lg shadow-purple-500/30 hover:scale-105 transition-transform cursor-pointer">
-                ИИ
-              </div>
+              <Button 
+                variant="ghost" 
+                onClick={handleLogout}
+                className="rounded-xl hover:bg-red-100/50 text-gray-600 hover:text-red-600"
+              >
+                <Icon name="LogOut" size={20} className="mr-2" />
+                Выйти
+              </Button>
             </div>
           </div>
         </div>
@@ -370,9 +400,9 @@ const Index = () => {
                   </div>
                   <div>
                     <h2 className="text-3xl font-heading font-bold bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 bg-clip-text text-transparent">
-                      Иван Иванов
+                      {user?.full_name || 'Загрузка...'}
                     </h2>
-                    <p className="text-purple-600/70 mt-1">ivan.ivanov@university.ru</p>
+                    <p className="text-purple-600/70 mt-1">{user?.email || ''}</p>
                     <Badge className="mt-3 bg-gradient-to-r from-yellow-400 to-orange-500 border-0 shadow-lg px-4 py-1.5 text-sm">
                       <Icon name="Crown" size={14} className="mr-1" />
                       Премиум аккаунт
@@ -386,21 +416,21 @@ const Index = () => {
                       <Icon name="GraduationCap" size={20} className="text-indigo-600" />
                       <label className="text-xs font-semibold text-indigo-600 uppercase tracking-wide">Университет</label>
                     </div>
-                    <p className="text-gray-900 font-semibold text-sm">МГУ им. М.В. Ломоносова</p>
+                    <p className="text-gray-900 font-semibold text-sm">{user?.university || 'Не указано'}</p>
                   </div>
                   <div className="p-5 bg-gradient-to-br from-purple-50 to-pink-50 rounded-2xl">
                     <div className="flex items-center gap-3 mb-2">
                       <Icon name="BookOpen" size={20} className="text-purple-600" />
                       <label className="text-xs font-semibold text-purple-600 uppercase tracking-wide">Факультет</label>
                     </div>
-                    <p className="text-gray-900 font-semibold text-sm">ВМК</p>
+                    <p className="text-gray-900 font-semibold text-sm">{user?.faculty || 'Не указано'}</p>
                   </div>
                   <div className="p-5 bg-gradient-to-br from-pink-50 to-rose-50 rounded-2xl">
                     <div className="flex items-center gap-3 mb-2">
                       <Icon name="Users" size={20} className="text-pink-600" />
                       <label className="text-xs font-semibold text-pink-600 uppercase tracking-wide">Курс</label>
                     </div>
-                    <p className="text-gray-900 font-semibold text-sm">2 курс, гр. 201</p>
+                    <p className="text-gray-900 font-semibold text-sm">{user?.course || 'Не указано'}</p>
                   </div>
                 </div>
 

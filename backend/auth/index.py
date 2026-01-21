@@ -13,10 +13,7 @@ def get_db_connection():
     """Создаёт подключение к PostgreSQL базе данных"""
     dsn = os.environ['DATABASE_URL']
     schema = os.environ.get('MAIN_DB_SCHEMA', 'public')
-    conn = psycopg2.connect(dsn)
-    with conn.cursor() as cur:
-        cur.execute(f"SET search_path TO {schema}")
-    conn.commit()
+    conn = psycopg2.connect(dsn, options=f'-c search_path={schema}')
     return conn
 
 
