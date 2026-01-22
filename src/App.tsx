@@ -11,6 +11,10 @@ import Profile from "./pages/Profile";
 import Materials from "./pages/Materials";
 import ExamPrep from "./pages/ExamPrep";
 import Pricing from "./pages/Pricing";
+import Assistant from "./pages/Assistant";
+import Calendar from "./pages/Calendar";
+import Sharing from "./pages/Sharing";
+import Analytics from "./pages/Analytics";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -29,6 +33,10 @@ const App = () => (
           <Route path="/materials" element={<Materials />} />
           <Route path="/exam-prep" element={<ExamPrep />} />
           <Route path="/pricing" element={<Pricing />} />
+          <Route path="/assistant" element={<Assistant />} />
+          <Route path="/calendar" element={<Calendar />} />
+          <Route path="/sharing" element={<Sharing />} />
+          <Route path="/analytics" element={<Analytics />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>

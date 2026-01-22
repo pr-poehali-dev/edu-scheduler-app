@@ -4,6 +4,8 @@ import { authService } from '@/lib/auth';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import Icon from '@/components/ui/icon';
 import { useToast } from '@/hooks/use-toast';
 
@@ -26,6 +28,9 @@ const Materials = () => {
   const [materials, setMaterials] = useState<Material[]>([]);
   const [isUploading, setIsUploading] = useState(false);
   const [selectedMaterial, setSelectedMaterial] = useState<Material | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filterSubject, setFilterSubject] = useState<string>('all');
+  const [sortBy, setSortBy] = useState<string>('date');
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -240,6 +245,45 @@ const Materials = () => {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {materials.length > 0 && (
+          <div className="mb-6 grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="relative">
+              <Icon name="Search" size={20} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+              <Input
+                type="text"
+                placeholder="Поиск по названию или тексту..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-10 rounded-xl border-2 border-purple-200"
+              />
+            </div>
+            
+            <Select value={filterSubject} onValueChange={setFilterSubject}>
+              <SelectTrigger className="rounded-xl border-2 border-purple-200">
+                <SelectValue placeholder="Все предметы" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Все предметы</SelectItem>
+                {[...new Set(materials.map(m => m.subject).filter(Boolean))].map(subject => (
+                  <SelectItem key={subject} value={subject!}>{subject}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <Select value={sortBy} onValueChange={setSortBy}>
+              <SelectTrigger className="rounded-xl border-2 border-purple-200">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="date">Сначала новые</SelectItem>
+                <SelectItem value="date-old">Сначала старые</SelectItem>
+                <SelectItem value="name">По названию (А-Я)</SelectItem>
+                <SelectItem value="subject">По предмету</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        )}
+
         {materials.length === 0 ? (
           <Card className="p-12 text-center bg-white border-2 border-dashed border-purple-200">
             <div className="w-20 h-20 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-indigo-100 to-purple-100 flex items-center justify-center">
@@ -259,7 +303,30 @@ const Materials = () => {
           </Card>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {materials.map((material) => (
+            {materials
+              .filter(m => {
+                const matchesSearch = searchQuery === '' || 
+                  m.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                  m.recognized_text?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                  m.summary?.toLowerCase().includes(searchQuery.toLowerCase());
+                
+                const matchesSubject = filterSubject === 'all' || m.subject === filterSubject;
+                
+                return matchesSearch && matchesSubject;
+              })
+              .sort((a, b) => {
+                if (sortBy === 'date') {
+                  return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+                } else if (sortBy === 'date-old') {
+                  return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+                } else if (sortBy === 'name') {
+                  return a.title.localeCompare(b.title);
+                } else if (sortBy === 'subject') {
+                  return (a.subject || '').localeCompare(b.subject || '');
+                }
+                return 0;
+              })
+              .map((material) => (
               <Card
                 key={material.id}
                 className="group cursor-pointer overflow-hidden bg-white hover:shadow-2xl hover:shadow-purple-500/20 transition-all duration-300 hover:scale-105"

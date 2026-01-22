@@ -1,0 +1,48 @@
+{
+  "tests": [
+    {
+      "name": "Create shared schedule",
+      "method": "POST",
+      "path": "/",
+      "headers": {
+        "Authorization": "Bearer mock-token"
+      },
+      "body": {
+        "action": "create",
+        "title": "Группа 401",
+        "description": "Расписание нашей группы"
+      },
+      "expectedStatus": 200,
+      "expectedBody": {
+        "success": true,
+        "share_code": "string"
+      },
+      "bodyMatcher": "partial"
+    },
+    {
+      "name": "Get my shared schedules",
+      "method": "GET",
+      "path": "/?action=my_shares",
+      "headers": {
+        "Authorization": "Bearer mock-token"
+      },
+      "expectedStatus": 200,
+      "expectedBody": {
+        "shares": []
+      },
+      "bodyMatcher": "partial"
+    },
+    {
+      "name": "Subscribe without code",
+      "method": "POST",
+      "path": "/",
+      "headers": {
+        "Authorization": "Bearer mock-token"
+      },
+      "body": {
+        "action": "subscribe"
+      },
+      "expectedStatus": 400
+    }
+  ]
+}

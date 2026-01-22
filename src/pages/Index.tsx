@@ -48,6 +48,8 @@ const Index = () => {
   const [isAddingLesson, setIsAddingLesson] = useState(false);
   const [isAddingTask, setIsAddingTask] = useState(false);
   const [selectedDay, setSelectedDay] = useState(1);
+  const [taskFilter, setTaskFilter] = useState<'all' | 'active' | 'completed'>('all');
+  const [taskSearch, setTaskSearch] = useState('');
 
   const [lessonForm, setLessonForm] = useState({
     subject: '',
@@ -322,6 +324,14 @@ const Index = () => {
               </div>
             </div>
             <div className="flex items-center gap-2">
+              <Button 
+                variant="ghost" 
+                size="icon"
+                onClick={() => navigate('/calendar')}
+                className="hover:bg-purple-100/50 rounded-xl"
+              >
+                <Icon name="CalendarDays" size={20} className="text-purple-600" />
+              </Button>
               <Button variant="ghost" size="icon" className="relative hover:bg-purple-100/50 rounded-xl">
                 <Icon name="Bell" size={20} className="text-purple-600" />
                 <span className="absolute top-2 right-2 w-2 h-2 bg-gradient-to-br from-pink-500 to-rose-500 rounded-full animate-pulse shadow-lg shadow-pink-500/50"></span>
@@ -350,19 +360,53 @@ const Index = () => {
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <NotificationPrompt />
         
-        <Card 
-          onClick={() => navigate('/exam-prep')}
-          className="mt-6 mb-6 p-6 bg-gradient-to-r from-yellow-50 via-orange-50 to-red-50 border-2 border-orange-300 cursor-pointer hover:shadow-2xl hover:shadow-orange-500/30 transition-all duration-300 hover:scale-[1.02]"
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6 mb-6">
+          <Card 
+            onClick={() => navigate('/assistant')}
+            className="p-6 bg-gradient-to-r from-blue-50 via-indigo-50 to-purple-50 border-2 border-indigo-300 cursor-pointer hover:shadow-2xl hover:shadow-indigo-500/30 transition-all duration-300 hover:scale-[1.02]"
+          >
+            <div className="flex items-center gap-4">
+              <div className="w-16 h-16 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl flex items-center justify-center shadow-lg">
+                <Icon name="Bot" size={32} className="text-white" />
+              </div>
+              <div className="flex-1">
+                <h3 className="text-xl font-bold text-gray-800 mb-1">ИИ-Ассистент</h3>
+                <p className="text-sm text-gray-600">Задай вопрос по своим материалам</p>
+              </div>
+              <Icon name="ArrowRight" size={24} className="text-indigo-600" />
+            </div>
+          </Card>
+          
+          <Card 
+            onClick={() => navigate('/exam-prep')}
+            className="p-6 bg-gradient-to-r from-yellow-50 via-orange-50 to-red-50 border-2 border-orange-300 cursor-pointer hover:shadow-2xl hover:shadow-orange-500/30 transition-all duration-300 hover:scale-[1.02]"
+          >
+            <div className="flex items-center gap-4">
+              <div className="w-16 h-16 bg-gradient-to-br from-orange-500 to-red-600 rounded-2xl flex items-center justify-center shadow-lg">
+                <span className="text-3xl">🎯</span>
+              </div>
+              <div className="flex-1">
+                <h3 className="text-xl font-bold text-gray-800 mb-1">Прогноз экзамена</h3>
+                <p className="text-sm text-gray-600">ИИ предсказывает вопросы на экзамене</p>
+              </div>
+              <Icon name="ArrowRight" size={24} className="text-orange-600" />
+            </div>
+          </Card>
+        </div>
+
+        <Card
+          onClick={() => navigate('/sharing')}
+          className="mb-6 p-6 bg-gradient-to-r from-emerald-50 via-green-50 to-teal-50 border-2 border-green-300 cursor-pointer hover:shadow-2xl hover:shadow-green-500/30 transition-all duration-300 hover:scale-[1.02]"
         >
           <div className="flex items-center gap-4">
-            <div className="w-16 h-16 bg-gradient-to-br from-orange-500 to-red-600 rounded-2xl flex items-center justify-center shadow-lg">
-              <span className="text-3xl">🎯</span>
+            <div className="w-16 h-16 bg-gradient-to-br from-green-500 to-emerald-600 rounded-2xl flex items-center justify-center shadow-lg">
+              <Icon name="Share2" size={32} className="text-white" />
             </div>
             <div className="flex-1">
-              <h3 className="text-xl font-bold text-gray-800 mb-1">Прогноз вопросов на экзамене</h3>
-              <p className="text-sm text-gray-600">AI анализирует твои материалы и предсказывает 20 самых вероятных вопросов</p>
+              <h3 className="text-xl font-bold text-gray-800 mb-1">Расшарить расписание с группой</h3>
+              <p className="text-sm text-gray-600">Создай код доступа и поделись расписанием с одногруппниками</p>
             </div>
-            <Icon name="ArrowRight" size={24} className="text-orange-600" />
+            <Icon name="ArrowRight" size={24} className="text-green-600" />
           </div>
         </Card>
 
@@ -421,7 +465,7 @@ const Index = () => {
               <Icon name="Camera" size={20} className="mr-2" />
               <span className="hidden sm:inline font-semibold">Сканер</span>
             </TabsTrigger>
-            <TabsTrigger value="analytics" className="rounded-xl data-[state=active]:bg-gradient-to-br data-[state=active]:from-indigo-600 data-[state=active]:to-blue-600 data-[state=active]:text-white data-[state=active]:shadow-lg data-[state=active]:shadow-blue-500/30 transition-all">
+            <TabsTrigger value="analytics" onClick={() => navigate('/analytics')} className="rounded-xl data-[state=active]:bg-gradient-to-br data-[state=active]:from-indigo-600 data-[state=active]:to-blue-600 data-[state=active]:text-white data-[state=active]:shadow-lg data-[state=active]:shadow-blue-500/30 transition-all">
               <Icon name="BarChart3" size={20} className="mr-2" />
               <span className="hidden sm:inline font-semibold">Аналитика</span>
             </TabsTrigger>
@@ -580,6 +624,42 @@ const Index = () => {
               </Button>
             </div>
 
+            <div className="flex gap-4 mb-6">
+              <div className="relative flex-1">
+                <Icon name="Search" size={20} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                <Input
+                  type="text"
+                  placeholder="Поиск задачи..."
+                  value={taskSearch}
+                  onChange={(e) => setTaskSearch(e.target.value)}
+                  className="pl-10 rounded-xl border-2 border-purple-200"
+                />
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  variant={taskFilter === 'all' ? 'default' : 'outline'}
+                  onClick={() => setTaskFilter('all')}
+                  className="rounded-xl"
+                >
+                  Все
+                </Button>
+                <Button
+                  variant={taskFilter === 'active' ? 'default' : 'outline'}
+                  onClick={() => setTaskFilter('active')}
+                  className="rounded-xl"
+                >
+                  Активные
+                </Button>
+                <Button
+                  variant={taskFilter === 'completed' ? 'default' : 'outline'}
+                  onClick={() => setTaskFilter('completed')}
+                  className="rounded-xl"
+                >
+                  Выполненные
+                </Button>
+              </div>
+            </div>
+
             {isAddingTask && (
               <Card className="p-6 bg-white mb-6">
                 <h3 className="text-lg font-bold mb-4">Новая задача</h3>
@@ -654,7 +734,20 @@ const Index = () => {
                   <p className="text-gray-600">Нет задач</p>
                 </Card>
               ) : (
-                tasks.map((task) => (
+                tasks
+                  .filter(task => {
+                    const matchesSearch = taskSearch === '' ||
+                      task.title.toLowerCase().includes(taskSearch.toLowerCase()) ||
+                      task.description?.toLowerCase().includes(taskSearch.toLowerCase());
+                    
+                    const matchesFilter = 
+                      taskFilter === 'all' ||
+                      (taskFilter === 'active' && !task.completed) ||
+                      (taskFilter === 'completed' && task.completed);
+                    
+                    return matchesSearch && matchesFilter;
+                  })
+                  .map((task) => (
                   <Card key={task.id} className={`p-5 bg-white hover:shadow-xl transition-all ${task.completed ? 'opacity-60' : ''}`}>
                     <div className="flex items-start gap-4">
                       <Checkbox
