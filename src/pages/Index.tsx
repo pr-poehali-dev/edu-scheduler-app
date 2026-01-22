@@ -84,6 +84,14 @@ const Index = () => {
               </Button>
               <Button 
                 variant="ghost" 
+                onClick={() => navigate('/profile')}
+                className="rounded-xl hover:bg-purple-100/50 text-gray-600"
+              >
+                <Icon name="User" size={20} className="mr-2" />
+                Профиль
+              </Button>
+              <Button 
+                variant="ghost" 
                 onClick={handleLogout}
                 className="rounded-xl hover:bg-red-100/50 text-gray-600 hover:text-red-600"
               >

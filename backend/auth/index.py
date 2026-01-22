@@ -49,7 +49,7 @@ def handler(event: dict, context) -> dict:
             'statusCode': 200,
             'headers': {
                 'Access-Control-Allow-Origin': '*',
-                'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+                'Access-Control-Allow-Methods': 'GET, POST, PUT, OPTIONS',
                 'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Authorization'
             },
             'body': ''
@@ -222,6 +222,77 @@ def handler(event: dict, context) -> dict:
                 """, (payload['user_id'],))
                 
                 user = cur.fetchone()
+                
+                if not user:
+                    return {
+                        'statusCode': 404,
+                        'headers': headers,
+                        'body': json.dumps({'error': 'Пользователь не найден'})
+                    }
+                
+                return {
+                    'statusCode': 200,
+                    'headers': headers,
+                    'body': json.dumps({
+                        'user': {
+                            'id': user['id'],
+                            'email': user['email'],
+                            'full_name': user['full_name'],
+                            'university': user['university'],
+                            'faculty': user['faculty'],
+                            'course': user['course']
+                        }
+                    })
+                }
+        finally:
+            conn.close()
+    
+    # PUT /update - Обновление профиля
+    elif method == 'PUT':
+        auth_header = event.get('headers', {}).get('X-Authorization', '')
+        token = auth_header.replace('Bearer ', '')
+        
+        if not token:
+            return {
+                'statusCode': 401,
+                'headers': headers,
+                'body': json.dumps({'error': 'Токен не предоставлен'})
+            }
+        
+        payload = verify_token(token)
+        
+        if not payload:
+            return {
+                'statusCode': 401,
+                'headers': headers,
+                'body': json.dumps({'error': 'Недействительный токен'})
+            }
+        
+        body = json.loads(event.get('body', '{}'))
+        full_name = body.get('full_name', '').strip()
+        university = body.get('university', '').strip()
+        faculty = body.get('faculty', '').strip()
+        course = body.get('course', '').strip()
+        
+        if not full_name:
+            return {
+                'statusCode': 400,
+                'headers': headers,
+                'body': json.dumps({'error': 'Имя не может быть пустым'})
+            }
+        
+        conn = get_db_connection()
+        try:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                cur.execute("""
+                    UPDATE users 
+                    SET full_name = %s, university = %s, faculty = %s, course = %s
+                    WHERE id = %s
+                    RETURNING id, email, full_name, university, faculty, course
+                """, (full_name, university, faculty, course, payload['user_id']))
+                
+                user = cur.fetchone()
+                conn.commit()
                 
                 if not user:
                     return {
