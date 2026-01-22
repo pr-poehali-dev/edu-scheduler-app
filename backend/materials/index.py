@@ -50,11 +50,14 @@ def upload_to_s3(image_data: bytes, filename: str) -> str:
 
 
 def recognize_text_from_image(image_url: str) -> dict:
-    """Использует GPT-4 Vision для распознавания текста и создания резюме"""
-    client = OpenAI(api_key=os.environ['OPENAI_API_KEY'])
+    """Использует DeepSeek для распознавания текста и создания резюме"""
+    client = OpenAI(
+        api_key=os.environ['DEEPSEEK_API_KEY'],
+        base_url="https://api.deepseek.com"
+    )
     
     response = client.chat.completions.create(
-        model="gpt-4o",
+        model="deepseek-chat",
         messages=[
             {
                 "role": "user",
