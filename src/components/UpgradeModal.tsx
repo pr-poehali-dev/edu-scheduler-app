@@ -20,7 +20,7 @@ const UpgradeModal = ({ open, onClose, feature, description }: UpgradeModalProps
   const navigate = useNavigate();
 
   return (
-    <Dialog open={open} onOpenChange={onClose}>
+    <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <div className="w-16 h-16 mx-auto mb-4 bg-gradient-to-br from-indigo-600 via-purple-600 to-pink-600 rounded-2xl flex items-center justify-center shadow-lg shadow-purple-500/30">
