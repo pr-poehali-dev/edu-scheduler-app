@@ -5,14 +5,69 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Progress } from '@/components/ui/progress';
-
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Checkbox } from '@/components/ui/checkbox';
 import Icon from '@/components/ui/icon';
+import { useToast } from '@/hooks/use-toast';
+
+const SCHEDULE_URL = 'https://functions.poehali.dev/7030dc26-77cd-4b59-91e6-1be52f31cf8d';
+
+interface Lesson {
+  id: number;
+  subject: string;
+  type: string;
+  start_time: string;
+  end_time: string;
+  day_of_week: number;
+  room?: string;
+  teacher?: string;
+  color?: string;
+}
+
+interface Task {
+  id: number;
+  title: string;
+  description?: string;
+  subject?: string;
+  deadline?: string;
+  priority: string;
+  completed: boolean;
+}
 
 const Index = () => {
   const navigate = useNavigate();
+  const { toast } = useToast();
   const [activeTab, setActiveTab] = useState('schedule');
   const [user, setUser] = useState(authService.getUser());
+  const [schedule, setSchedule] = useState<Lesson[]>([]);
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [isAddingLesson, setIsAddingLesson] = useState(false);
+  const [isAddingTask, setIsAddingTask] = useState(false);
+  const [selectedDay, setSelectedDay] = useState(1);
+
+  const [lessonForm, setLessonForm] = useState({
+    subject: '',
+    type: 'lecture',
+    start_time: '',
+    end_time: '',
+    day_of_week: 1,
+    room: '',
+    teacher: '',
+    color: 'bg-purple-500'
+  });
+
+  const [taskForm, setTaskForm] = useState({
+    title: '',
+    description: '',
+    subject: '',
+    deadline: '',
+    priority: 'medium'
+  });
+
+  const dayNames = ['Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота'];
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -25,29 +80,178 @@ const Index = () => {
         navigate('/login');
       } else {
         setUser(verifiedUser);
+        loadSchedule();
+        loadTasks();
       }
     };
     checkAuth();
   }, [navigate]);
 
+  const loadSchedule = async () => {
+    try {
+      const token = authService.getToken();
+      const response = await fetch(`${SCHEDULE_URL}?path=schedule`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setSchedule(data.schedule);
+      }
+    } catch (error) {
+      console.error('Failed to load schedule:', error);
+    }
+  };
+
+  const loadTasks = async () => {
+    try {
+      const token = authService.getToken();
+      const response = await fetch(`${SCHEDULE_URL}?path=tasks`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setTasks(data.tasks);
+      }
+    } catch (error) {
+      console.error('Failed to load tasks:', error);
+    }
+  };
+
+  const handleAddLesson = async () => {
+    if (!lessonForm.subject || !lessonForm.start_time || !lessonForm.end_time) {
+      toast({
+        title: "Ошибка",
+        description: "Заполните обязательные поля",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    try {
+      const token = authService.getToken();
+      const response = await fetch(`${SCHEDULE_URL}?path=schedule`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(lessonForm)
+      });
+
+      if (response.ok) {
+        toast({ title: "Занятие добавлено" });
+        setIsAddingLesson(false);
+        setLessonForm({
+          subject: '',
+          type: 'lecture',
+          start_time: '',
+          end_time: '',
+          day_of_week: 1,
+          room: '',
+          teacher: '',
+          color: 'bg-purple-500'
+        });
+        loadSchedule();
+      }
+    } catch (error) {
+      toast({
+        title: "Ошибка",
+        description: "Не удалось добавить занятие",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleAddTask = async () => {
+    if (!taskForm.title) {
+      toast({
+        title: "Ошибка",
+        description: "Введите название задачи",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    try {
+      const token = authService.getToken();
+      const response = await fetch(`${SCHEDULE_URL}?path=tasks`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(taskForm)
+      });
+
+      if (response.ok) {
+        toast({ title: "Задача добавлена" });
+        setIsAddingTask(false);
+        setTaskForm({
+          title: '',
+          description: '',
+          subject: '',
+          deadline: '',
+          priority: 'medium'
+        });
+        loadTasks();
+      }
+    } catch (error) {
+      toast({
+        title: "Ошибка",
+        description: "Не удалось добавить задачу",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleToggleTask = async (task: Task) => {
+    try {
+      const token = authService.getToken();
+      const response = await fetch(`${SCHEDULE_URL}?path=tasks`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          ...task,
+          completed: !task.completed
+        })
+      });
+
+      if (response.ok) {
+        loadTasks();
+      }
+    } catch (error) {
+      console.error('Failed to toggle task:', error);
+    }
+  };
+
+  const handleDeleteTask = async (taskId: number) => {
+    try {
+      const token = authService.getToken();
+      const response = await fetch(`${SCHEDULE_URL}?path=tasks&id=${taskId}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+
+      if (response.ok) {
+        toast({ title: "Задача удалена" });
+        loadTasks();
+      }
+    } catch (error) {
+      toast({
+        title: "Ошибка",
+        description: "Не удалось удалить задачу",
+        variant: "destructive"
+      });
+    }
+  };
+
   const handleLogout = () => {
     authService.logout();
     navigate('/login');
   };
-
-  const schedule = [
-    { id: 1, subject: 'Математический анализ', time: '09:00 - 10:30', room: 'ауд. 301', type: 'lecture', color: 'bg-purple-500' },
-    { id: 2, subject: 'Программирование', time: '10:45 - 12:15', room: 'ауд. 205', type: 'practice', color: 'bg-blue-500' },
-    { id: 3, subject: 'Физика', time: '12:30 - 14:00', room: 'ауд. 410', type: 'lecture', color: 'bg-green-500' },
-    { id: 4, subject: 'Английский язык', time: '14:15 - 15:45', room: 'ауд. 102', type: 'practice', color: 'bg-orange-500' },
-  ];
-
-  const tasks = [
-    { id: 1, title: 'Решить задачи по матанализу', subject: 'Математика', deadline: '25 янв', priority: 'high', completed: false },
-    { id: 2, title: 'Написать лабораторную работу', subject: 'Программирование', deadline: '27 янв', priority: 'medium', completed: false },
-    { id: 3, title: 'Подготовить презентацию', subject: 'Физика', deadline: '30 янв', priority: 'low', completed: true },
-    { id: 4, title: 'Выучить слова по английскому', subject: 'Английский', deadline: '23 янв', priority: 'high', completed: false },
-  ];
 
   const getPriorityColor = (priority: string) => {
     switch (priority) {
@@ -57,6 +261,11 @@ const Index = () => {
       default: return 'bg-gray-500';
     }
   };
+
+  const todayLessons = schedule.filter(l => l.day_of_week === selectedDay);
+  const activeTasks = tasks.filter(t => !t.completed);
+  const completedTasks = tasks.filter(t => t.completed);
+  const completionRate = tasks.length > 0 ? Math.round((completedTasks.length / tasks.length) * 100) : 0;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50">
@@ -126,7 +335,7 @@ const Index = () => {
             <div className="relative z-10 flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600 group-hover:text-white transition-colors">Занятий сегодня</p>
-                <p className="text-4xl font-bold mt-3 bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent group-hover:text-white transition-all">4</p>
+                <p className="text-4xl font-bold mt-3 bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent group-hover:text-white transition-all">{todayLessons.length}</p>
               </div>
               <div className="w-14 h-14 bg-gradient-to-br from-indigo-100 to-purple-100 group-hover:from-white/20 group-hover:to-white/10 rounded-2xl flex items-center justify-center transition-all shadow-lg">
                 <Icon name="Calendar" size={28} className="text-indigo-600 group-hover:text-white transition-colors" />
@@ -139,7 +348,7 @@ const Index = () => {
             <div className="relative z-10 flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600 group-hover:text-white transition-colors">Активных задач</p>
-                <p className="text-4xl font-bold mt-3 bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent group-hover:text-white transition-all">3</p>
+                <p className="text-4xl font-bold mt-3 bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent group-hover:text-white transition-all">{activeTasks.length}</p>
               </div>
               <div className="w-14 h-14 bg-gradient-to-br from-purple-100 to-pink-100 group-hover:from-white/20 group-hover:to-white/10 rounded-2xl flex items-center justify-center transition-all shadow-lg">
                 <Icon name="CheckSquare" size={28} className="text-purple-600 group-hover:text-white transition-colors" />
@@ -152,7 +361,7 @@ const Index = () => {
             <div className="relative z-10 flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600 group-hover:text-white transition-colors">Выполнено задач</p>
-                <p className="text-4xl font-bold mt-3 bg-gradient-to-r from-pink-600 to-rose-600 bg-clip-text text-transparent group-hover:text-white transition-all">75%</p>
+                <p className="text-4xl font-bold mt-3 bg-gradient-to-r from-pink-600 to-rose-600 bg-clip-text text-transparent group-hover:text-white transition-all">{completionRate}%</p>
               </div>
               <div className="w-14 h-14 bg-gradient-to-br from-pink-100 to-rose-100 group-hover:from-white/20 group-hover:to-white/10 rounded-2xl flex items-center justify-center transition-all shadow-lg">
                 <Icon name="TrendingUp" size={28} className="text-pink-600 group-hover:text-white transition-colors" />
@@ -185,312 +394,295 @@ const Index = () => {
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="schedule" className="space-y-5 animate-fade-in">
+          <TabsContent value="schedule" className="space-y-5">
             <div className="flex items-center justify-between mb-6">
               <div>
                 <h2 className="text-3xl font-heading font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">Расписание</h2>
-                <p className="text-purple-600/70 text-sm mt-1">21 января, понедельник</p>
+                <p className="text-purple-600/70 text-sm mt-1">Управление занятиями</p>
               </div>
-              <Button className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 shadow-lg shadow-purple-500/30 rounded-xl">
+              <Button 
+                onClick={() => setIsAddingLesson(true)}
+                className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 shadow-lg shadow-purple-500/30 rounded-xl"
+              >
                 <Icon name="Plus" size={18} className="mr-2" />
-                Добавить
+                Добавить занятие
               </Button>
             </div>
-            <div className="space-y-4">
-              {schedule.map((lesson, index) => (
-                <Card key={lesson.id} className="group relative overflow-hidden p-6 bg-white hover:shadow-2xl transition-all duration-300 hover:scale-[1.02] border-0 shadow-md rounded-2xl">
-                  <div className="absolute left-0 top-0 bottom-0 w-1.5 bg-gradient-to-b from-indigo-600 to-purple-600 group-hover:w-2 transition-all"></div>
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-start gap-5 flex-1">
-                      <div className="relative">
-                        <div className={`w-16 h-16 ${lesson.color} rounded-2xl flex items-center justify-center text-white shadow-lg`}>
-                          <div className="text-center">
-                            <div className="text-xl font-bold leading-none">{lesson.time.split(':')[0]}</div>
-                            <div className="text-xs mt-0.5 opacity-90">{lesson.time.split(':')[1].split(' ')[0]}</div>
-                          </div>
-                        </div>
-                        {index === 0 && (
-                          <div className="absolute -top-2 -right-2 w-6 h-6 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-full flex items-center justify-center text-white text-xs font-bold shadow-lg">
-                            ✓
-                          </div>
-                        )}
-                      </div>
-                      <div className="flex-1">
-                        <h3 className="font-bold text-xl text-gray-900 mb-1">{lesson.subject}</h3>
-                        <p className="text-purple-600/70 text-sm mb-3">{lesson.time}</p>
-                        <div className="flex items-center gap-3">
-                          <Badge variant="secondary" className="text-xs px-3 py-1 rounded-lg bg-purple-100 text-purple-700 border-0">
-                            <Icon name="MapPin" size={14} className="mr-1" />
-                            {lesson.room}
-                          </Badge>
-                          <Badge variant={lesson.type === 'lecture' ? 'default' : 'outline'} className="text-xs px-3 py-1 rounded-lg">
-                            {lesson.type === 'lecture' ? '📚 Лекция' : '💻 Практика'}
-                          </Badge>
-                        </div>
-                      </div>
-                    </div>
-                    <Button variant="ghost" size="icon" className="rounded-xl hover:bg-purple-100/50">
-                      <Icon name="MoreVertical" size={20} className="text-gray-600" />
-                    </Button>
-                  </div>
-                </Card>
+
+            <div className="flex gap-2 mb-4 overflow-x-auto pb-2">
+              {dayNames.map((day, idx) => (
+                <Button
+                  key={idx}
+                  variant={selectedDay === idx + 1 ? "default" : "outline"}
+                  onClick={() => setSelectedDay(idx + 1)}
+                  className={selectedDay === idx + 1 ? "bg-gradient-to-r from-indigo-600 to-purple-600 text-white" : ""}
+                >
+                  {day}
+                </Button>
               ))}
+            </div>
+
+            {isAddingLesson && (
+              <Card className="p-6 bg-white mb-6">
+                <h3 className="text-lg font-bold mb-4">Новое занятие</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <Label>Предмет *</Label>
+                    <Input
+                      value={lessonForm.subject}
+                      onChange={(e) => setLessonForm({...lessonForm, subject: e.target.value})}
+                      placeholder="Математический анализ"
+                      className="mt-2"
+                    />
+                  </div>
+                  <div>
+                    <Label>Тип</Label>
+                    <Select value={lessonForm.type} onValueChange={(v) => setLessonForm({...lessonForm, type: v})}>
+                      <SelectTrigger className="mt-2">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="lecture">Лекция</SelectItem>
+                        <SelectItem value="practice">Практика</SelectItem>
+                        <SelectItem value="lab">Лабораторная</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label>Начало *</Label>
+                    <Input
+                      type="time"
+                      value={lessonForm.start_time}
+                      onChange={(e) => setLessonForm({...lessonForm, start_time: e.target.value})}
+                      className="mt-2"
+                    />
+                  </div>
+                  <div>
+                    <Label>Конец *</Label>
+                    <Input
+                      type="time"
+                      value={lessonForm.end_time}
+                      onChange={(e) => setLessonForm({...lessonForm, end_time: e.target.value})}
+                      className="mt-2"
+                    />
+                  </div>
+                  <div>
+                    <Label>День недели</Label>
+                    <Select value={String(lessonForm.day_of_week)} onValueChange={(v) => setLessonForm({...lessonForm, day_of_week: Number(v)})}>
+                      <SelectTrigger className="mt-2">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {dayNames.map((day, idx) => (
+                          <SelectItem key={idx} value={String(idx + 1)}>{day}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label>Аудитория</Label>
+                    <Input
+                      value={lessonForm.room}
+                      onChange={(e) => setLessonForm({...lessonForm, room: e.target.value})}
+                      placeholder="ауд. 301"
+                      className="mt-2"
+                    />
+                  </div>
+                </div>
+                <div className="flex gap-2 mt-4">
+                  <Button onClick={handleAddLesson} className="bg-gradient-to-r from-indigo-600 to-purple-600">
+                    Сохранить
+                  </Button>
+                  <Button variant="outline" onClick={() => setIsAddingLesson(false)}>
+                    Отмена
+                  </Button>
+                </div>
+              </Card>
+            )}
+
+            <div className="space-y-4">
+              {todayLessons.length === 0 ? (
+                <Card className="p-12 text-center bg-white border-2 border-dashed border-purple-200">
+                  <Icon name="CalendarOff" size={48} className="mx-auto mb-4 text-purple-300" />
+                  <p className="text-gray-600">Нет занятий на этот день</p>
+                </Card>
+              ) : (
+                todayLessons.map((lesson) => (
+                  <Card key={lesson.id} className="p-6 bg-white hover:shadow-xl transition-all">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-4">
+                        <div className={`w-16 h-16 ${lesson.color || 'bg-purple-500'} rounded-xl flex items-center justify-center text-white shadow-lg`}>
+                          <Icon name="BookOpen" size={24} />
+                        </div>
+                        <div>
+                          <h3 className="font-bold text-lg">{lesson.subject}</h3>
+                          <p className="text-sm text-gray-600">{lesson.start_time} - {lesson.end_time}</p>
+                          <p className="text-xs text-gray-500">{lesson.room} • {lesson.type}</p>
+                        </div>
+                      </div>
+                      <Badge>{lesson.type === 'lecture' ? 'Лекция' : lesson.type === 'practice' ? 'Практика' : 'Лаб'}</Badge>
+                    </div>
+                  </Card>
+                ))
+              )}
             </div>
           </TabsContent>
 
-          <TabsContent value="tasks" className="space-y-5 animate-fade-in">
+          <TabsContent value="tasks" className="space-y-5">
             <div className="flex items-center justify-between mb-6">
               <div>
-                <h2 className="text-3xl font-heading font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">Учебные задачи</h2>
-                <p className="text-purple-600/70 text-sm mt-1">3 активные задачи</p>
+                <h2 className="text-3xl font-heading font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">Задачи</h2>
+                <p className="text-purple-600/70 text-sm mt-1">Управление делами</p>
               </div>
-              <Button className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 shadow-lg shadow-pink-500/30 rounded-xl">
+              <Button 
+                onClick={() => setIsAddingTask(true)}
+                className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 shadow-lg shadow-pink-500/30 rounded-xl"
+              >
                 <Icon name="Plus" size={18} className="mr-2" />
                 Новая задача
               </Button>
             </div>
-            <div className="space-y-4">
-              {tasks.map((task) => (
-                <Card key={task.id} className={`group p-6 bg-white hover:shadow-2xl transition-all duration-300 hover:scale-[1.02] border-0 shadow-md rounded-2xl ${task.completed ? 'opacity-70' : ''}`}>
-                  <div className="flex items-start gap-5">
-                    <div className="mt-1">
-                      <div className="relative">
-                        <input
-                          type="checkbox"
-                          checked={task.completed}
-                          className="w-6 h-6 rounded-lg border-2 border-purple-300 text-purple-600 focus:ring-purple-500 focus:ring-2 cursor-pointer transition-all checked:scale-110"
-                          readOnly
-                        />
-                        {task.completed && (
-                          <Icon name="Check" size={16} className="absolute top-1 left-1 text-white pointer-events-none" />
-                        )}
-                      </div>
-                    </div>
-                    <div className="flex-1">
-                      <div className="flex items-start justify-between mb-2">
-                        <h3 className={`font-bold text-lg ${task.completed ? 'line-through text-gray-400' : 'text-gray-900'}`}>
-                          {task.title}
-                        </h3>
-                        <div className={`w-3 h-3 ${getPriorityColor(task.priority)} rounded-full shadow-lg animate-pulse`}></div>
-                      </div>
-                      <p className="text-purple-600/70 text-sm mb-3">{task.subject}</p>
-                      <div className="flex items-center gap-3 flex-wrap">
-                        <Badge variant="outline" className="text-xs px-3 py-1 rounded-lg border-purple-200 bg-purple-50 text-purple-700">
-                          <Icon name="Clock" size={14} className="mr-1" />
-                          {task.deadline}
-                        </Badge>
-                        <Badge className={`text-xs px-3 py-1 rounded-lg ${
-                          task.priority === 'high' ? 'bg-red-100 text-red-700 border-0' :
-                          task.priority === 'medium' ? 'bg-yellow-100 text-yellow-700 border-0' :
-                          'bg-green-100 text-green-700 border-0'
-                        }`}>
-                          {task.priority === 'high' ? '🔥 Высокий' : task.priority === 'medium' ? '⚡ Средний' : '✨ Низкий'}
-                        </Badge>
-                      </div>
-                    </div>
-                  </div>
-                </Card>
-              ))}
-            </div>
-          </TabsContent>
 
-          <TabsContent value="scanner" className="animate-fade-in">
-            <Card className="relative overflow-hidden p-16 text-center bg-gradient-to-br from-pink-50 via-purple-50 to-indigo-50 border-0 shadow-2xl rounded-3xl">
-              <div className="absolute top-0 right-0 w-64 h-64 bg-gradient-to-br from-purple-400/20 to-pink-400/20 rounded-full blur-3xl"></div>
-              <div className="absolute bottom-0 left-0 w-64 h-64 bg-gradient-to-br from-indigo-400/20 to-blue-400/20 rounded-full blur-3xl"></div>
-              <div className="relative z-10 max-w-2xl mx-auto">
-                <div className="relative inline-block mb-8">
-                  <div className="w-32 h-32 bg-gradient-to-br from-pink-500 via-purple-600 to-indigo-600 rounded-3xl flex items-center justify-center mx-auto shadow-2xl shadow-purple-500/40 animate-scale-in">
-                    <Icon name="Camera" size={64} className="text-white" />
-                  </div>
-                  <div className="absolute -top-2 -right-2 w-10 h-10 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-full flex items-center justify-center shadow-lg animate-pulse">
-                    <Icon name="Sparkles" size={20} className="text-white" />
-                  </div>
-                </div>
-                <h2 className="text-4xl font-heading font-bold bg-gradient-to-r from-pink-600 via-purple-600 to-indigo-600 bg-clip-text text-transparent mb-4">
-                  ИИ Сканер Расписания
-                </h2>
-                <p className="text-purple-600/80 text-lg mb-10 leading-relaxed max-w-xl mx-auto">
-                  Сфотографируй своё расписание — и волшебство начинается! ✨<br/>
-                  ИИ мгновенно распознает все занятия и добавит их в твой календарь
-                </p>
-                <div className="flex flex-col sm:flex-row gap-4 justify-center mb-6">
-                  <Button size="lg" className="bg-gradient-to-r from-pink-600 via-purple-600 to-indigo-600 hover:from-pink-700 hover:via-purple-700 hover:to-indigo-700 shadow-2xl shadow-purple-500/40 text-lg px-8 py-6 rounded-2xl">
-                    <Icon name="Upload" size={24} className="mr-3" />
-                    Загрузить фото
-                  </Button>
-                  <Button size="lg" variant="outline" className="border-2 border-purple-300 text-purple-600 hover:bg-purple-50 text-lg px-8 py-6 rounded-2xl">
-                    <Icon name="Camera" size={24} className="mr-3" />
-                    Открыть камеру
-                  </Button>
-                </div>
-                <div className="flex items-center justify-center gap-6 text-sm text-purple-600/60">
-                  <div className="flex items-center gap-2">
-                    <Icon name="FileImage" size={16} />
-                    <span>JPG, PNG</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Icon name="FileText" size={16} />
-                    <span>PDF</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Icon name="Zap" size={16} />
-                    <span>До 10 MB</span>
-                  </div>
-                </div>
-              </div>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="analytics" className="space-y-6 animate-fade-in">
-            <div className="mb-6">
-              <h2 className="text-3xl font-heading font-bold bg-gradient-to-r from-indigo-600 to-blue-600 bg-clip-text text-transparent">Учебная аналитика</h2>
-              <p className="text-purple-600/70 text-sm mt-1">Твой прогресс за эту неделю</p>
-            </div>
-            
-            <Card className="p-8 bg-white border-0 shadow-xl rounded-2xl">
-              <h3 className="font-bold text-xl mb-6 text-gray-900">Выполнение задач по предметам</h3>
-              <div className="space-y-6">
-                <div>
-                  <div className="flex items-center justify-between mb-3">
-                    <span className="text-sm font-semibold text-gray-700">📐 Математика</span>
-                    <span className="text-sm font-bold text-purple-600 bg-purple-100 px-3 py-1 rounded-lg">80%</span>
-                  </div>
-                  <div className="h-3 bg-purple-100 rounded-full overflow-hidden">
-                    <div className="h-full bg-gradient-to-r from-purple-500 to-purple-600 rounded-full shadow-lg" style={{ width: '80%' }}></div>
-                  </div>
-                </div>
-                <div>
-                  <div className="flex items-center justify-between mb-3">
-                    <span className="text-sm font-semibold text-gray-700">💻 Программирование</span>
-                    <span className="text-sm font-bold text-blue-600 bg-blue-100 px-3 py-1 rounded-lg">65%</span>
-                  </div>
-                  <div className="h-3 bg-blue-100 rounded-full overflow-hidden">
-                    <div className="h-full bg-gradient-to-r from-blue-500 to-blue-600 rounded-full shadow-lg" style={{ width: '65%' }}></div>
-                  </div>
-                </div>
-                <div>
-                  <div className="flex items-center justify-between mb-3">
-                    <span className="text-sm font-semibold text-gray-700">⚛️ Физика</span>
-                    <span className="text-sm font-bold text-green-600 bg-green-100 px-3 py-1 rounded-lg">90%</span>
-                  </div>
-                  <div className="h-3 bg-green-100 rounded-full overflow-hidden">
-                    <div className="h-full bg-gradient-to-r from-green-500 to-green-600 rounded-full shadow-lg" style={{ width: '90%' }}></div>
-                  </div>
-                </div>
-              </div>
-            </Card>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <Card className="p-8 bg-gradient-to-br from-indigo-50 to-purple-50 border-0 shadow-xl rounded-2xl">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="font-bold text-lg text-gray-900">Занятия в неделю</h3>
-                  <div className="w-12 h-12 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl flex items-center justify-center shadow-lg">
-                    <Icon name="Calendar" size={24} className="text-white" />
-                  </div>
-                </div>
-                <div className="text-5xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent mb-2">24</div>
-                <div className="flex items-center gap-2 text-sm text-green-600 font-semibold">
-                  <Icon name="TrendingUp" size={16} />
-                  <span>+2 за неделю</span>
-                </div>
-              </Card>
-
-              <Card className="p-8 bg-gradient-to-br from-pink-50 to-rose-50 border-0 shadow-xl rounded-2xl">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="font-bold text-lg text-gray-900">Средний балл</h3>
-                  <div className="w-12 h-12 bg-gradient-to-br from-pink-500 to-rose-600 rounded-2xl flex items-center justify-center shadow-lg">
-                    <Icon name="Star" size={24} className="text-white" />
-                  </div>
-                </div>
-                <div className="text-5xl font-bold bg-gradient-to-r from-pink-600 to-rose-600 bg-clip-text text-transparent mb-2">4.5</div>
-                <p className="text-sm text-gray-600 font-semibold">Отличный результат! 🎉</p>
-              </Card>
-            </div>
-          </TabsContent>
-
-          <TabsContent value="profile" className="space-y-6 animate-fade-in">
-            <Card className="relative overflow-hidden p-8 bg-gradient-to-br from-white to-purple-50 border-0 shadow-xl rounded-3xl">
-              <div className="absolute top-0 right-0 w-48 h-48 bg-gradient-to-br from-purple-300/20 to-pink-300/20 rounded-full blur-3xl"></div>
-              <div className="relative z-10">
-                <div className="flex items-center gap-6 mb-8">
-                  <div className="relative">
-                    <div className="w-28 h-28 rounded-3xl bg-gradient-to-br from-indigo-600 via-purple-600 to-pink-600 flex items-center justify-center text-white text-3xl font-bold shadow-2xl shadow-purple-500/40">
-                      ИИ
-                    </div>
-                    <div className="absolute -bottom-2 -right-2 w-10 h-10 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-full flex items-center justify-center shadow-lg">
-                      <Icon name="Sparkles" size={20} className="text-white" />
-                    </div>
+            {isAddingTask && (
+              <Card className="p-6 bg-white mb-6">
+                <h3 className="text-lg font-bold mb-4">Новая задача</h3>
+                <div className="space-y-4">
+                  <div>
+                    <Label>Название *</Label>
+                    <Input
+                      value={taskForm.title}
+                      onChange={(e) => setTaskForm({...taskForm, title: e.target.value})}
+                      placeholder="Решить задачи по математике"
+                      className="mt-2"
+                    />
                   </div>
                   <div>
-                    <h2 className="text-3xl font-heading font-bold bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 bg-clip-text text-transparent">
-                      {user?.full_name || 'Загрузка...'}
-                    </h2>
-                    <p className="text-purple-600/70 mt-1">{user?.email || ''}</p>
-                    <Badge className="mt-3 bg-gradient-to-r from-yellow-400 to-orange-500 border-0 shadow-lg px-4 py-1.5 text-sm">
-                      <Icon name="Crown" size={14} className="mr-1" />
-                      Премиум аккаунт
-                    </Badge>
+                    <Label>Описание</Label>
+                    <Textarea
+                      value={taskForm.description}
+                      onChange={(e) => setTaskForm({...taskForm, description: e.target.value})}
+                      placeholder="Дополнительная информация..."
+                      className="mt-2"
+                    />
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                      <Label>Предмет</Label>
+                      <Input
+                        value={taskForm.subject}
+                        onChange={(e) => setTaskForm({...taskForm, subject: e.target.value})}
+                        placeholder="Математика"
+                        className="mt-2"
+                      />
+                    </div>
+                    <div>
+                      <Label>Дедлайн</Label>
+                      <Input
+                        type="datetime-local"
+                        value={taskForm.deadline}
+                        onChange={(e) => setTaskForm({...taskForm, deadline: e.target.value})}
+                        className="mt-2"
+                      />
+                    </div>
+                    <div>
+                      <Label>Приоритет</Label>
+                      <Select value={taskForm.priority} onValueChange={(v) => setTaskForm({...taskForm, priority: v})}>
+                        <SelectTrigger className="mt-2">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="low">Низкий</SelectItem>
+                          <SelectItem value="medium">Средний</SelectItem>
+                          <SelectItem value="high">Высокий</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
                   </div>
                 </div>
-                
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-                  <div className="p-5 bg-gradient-to-br from-indigo-50 to-purple-50 rounded-2xl">
-                    <div className="flex items-center gap-3 mb-2">
-                      <Icon name="GraduationCap" size={20} className="text-indigo-600" />
-                      <label className="text-xs font-semibold text-indigo-600 uppercase tracking-wide">Университет</label>
-                    </div>
-                    <p className="text-gray-900 font-semibold text-sm">{user?.university || 'Не указано'}</p>
-                  </div>
-                  <div className="p-5 bg-gradient-to-br from-purple-50 to-pink-50 rounded-2xl">
-                    <div className="flex items-center gap-3 mb-2">
-                      <Icon name="BookOpen" size={20} className="text-purple-600" />
-                      <label className="text-xs font-semibold text-purple-600 uppercase tracking-wide">Факультет</label>
-                    </div>
-                    <p className="text-gray-900 font-semibold text-sm">{user?.faculty || 'Не указано'}</p>
-                  </div>
-                  <div className="p-5 bg-gradient-to-br from-pink-50 to-rose-50 rounded-2xl">
-                    <div className="flex items-center gap-3 mb-2">
-                      <Icon name="Users" size={20} className="text-pink-600" />
-                      <label className="text-xs font-semibold text-pink-600 uppercase tracking-wide">Курс</label>
-                    </div>
-                    <p className="text-gray-900 font-semibold text-sm">{user?.course || 'Не указано'}</p>
-                  </div>
+                <div className="flex gap-2 mt-4">
+                  <Button onClick={handleAddTask} className="bg-gradient-to-r from-purple-600 to-pink-600">
+                    Создать
+                  </Button>
+                  <Button variant="outline" onClick={() => setIsAddingTask(false)}>
+                    Отмена
+                  </Button>
                 </div>
+              </Card>
+            )}
 
-                <div className="pt-6 border-t-2 border-purple-200/50">
-                  <h3 className="font-bold text-xl mb-5 text-gray-900 flex items-center gap-2">
-                    <Icon name="Settings" size={24} className="text-purple-600" />
-                    Настройки уведомлений
-                  </h3>
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between p-4 bg-gradient-to-r from-purple-50 to-indigo-50 rounded-xl">
-                      <div className="flex items-center gap-3">
-                        <Icon name="Bell" size={20} className="text-purple-600" />
-                        <span className="text-sm font-semibold text-gray-700">Напоминания о занятиях</span>
+            <div className="space-y-4">
+              {tasks.length === 0 ? (
+                <Card className="p-12 text-center bg-white border-2 border-dashed border-purple-200">
+                  <Icon name="ListTodo" size={48} className="mx-auto mb-4 text-purple-300" />
+                  <p className="text-gray-600">Нет задач</p>
+                </Card>
+              ) : (
+                tasks.map((task) => (
+                  <Card key={task.id} className={`p-5 bg-white hover:shadow-xl transition-all ${task.completed ? 'opacity-60' : ''}`}>
+                    <div className="flex items-start gap-4">
+                      <Checkbox
+                        checked={task.completed}
+                        onCheckedChange={() => handleToggleTask(task)}
+                        className="mt-1"
+                      />
+                      <div className="flex-1">
+                        <h3 className={`font-bold ${task.completed ? 'line-through text-gray-500' : ''}`}>{task.title}</h3>
+                        {task.description && <p className="text-sm text-gray-600 mt-1">{task.description}</p>}
+                        <div className="flex items-center gap-2 mt-2">
+                          {task.subject && <Badge variant="outline">{task.subject}</Badge>}
+                          {task.deadline && (
+                            <Badge variant="outline">
+                              <Icon name="Clock" size={12} className="mr-1" />
+                              {new Date(task.deadline).toLocaleString('ru-RU', {
+                                day: 'numeric',
+                                month: 'short',
+                                hour: '2-digit',
+                                minute: '2-digit'
+                              })}
+                            </Badge>
+                          )}
+                          <div className={`w-2 h-2 rounded-full ${getPriorityColor(task.priority)}`}></div>
+                        </div>
                       </div>
-                      <Badge variant="outline" className="border-purple-300 text-purple-700 bg-white font-semibold">За 15 минут</Badge>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleDeleteTask(task.id)}
+                        className="text-red-500 hover:bg-red-50"
+                      >
+                        <Icon name="Trash2" size={18} />
+                      </Button>
                     </div>
-                    <div className="flex items-center justify-between p-4 bg-gradient-to-r from-indigo-50 to-blue-50 rounded-xl">
-                      <div className="flex items-center gap-3">
-                        <Icon name="Clock" size={20} className="text-indigo-600" />
-                        <span className="text-sm font-semibold text-gray-700">Дедлайны по задачам</span>
-                      </div>
-                      <Badge variant="outline" className="border-indigo-300 text-indigo-700 bg-white font-semibold">За 1 день</Badge>
-                    </div>
-                    <div className="flex items-center justify-between p-4 bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl">
-                      <div className="flex items-center gap-3">
-                        <Icon name="Smartphone" size={20} className="text-green-600" />
-                        <span className="text-sm font-semibold text-gray-700">Push-уведомления</span>
-                      </div>
-                      <Badge className="bg-gradient-to-r from-green-500 to-emerald-600 border-0 shadow-lg font-semibold">
-                        <Icon name="Check" size={14} className="mr-1" />
-                        Включены
-                      </Badge>
-                    </div>
-                  </div>
+                  </Card>
+                ))
+              )}
+            </div>
+          </TabsContent>
+
+          <TabsContent value="analytics" className="space-y-5">
+            <Card className="p-12 text-center bg-white">
+              <Icon name="BarChart3" size={48} className="mx-auto mb-4 text-purple-300" />
+              <h3 className="text-xl font-bold text-gray-800 mb-2">Аналитика в разработке</h3>
+              <p className="text-gray-600">Скоро здесь появится статистика по учёбе</p>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="profile" className="space-y-5">
+            <Card className="p-8 bg-white">
+              <div className="flex items-center gap-4 mb-6">
+                <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-indigo-600 via-purple-600 to-pink-600 flex items-center justify-center shadow-lg">
+                  <span className="text-3xl font-bold text-white">
+                    {user?.full_name?.charAt(0)?.toUpperCase() || '?'}
+                  </span>
+                </div>
+                <div>
+                  <h2 className="text-2xl font-bold">{user?.full_name}</h2>
+                  <p className="text-gray-600">{user?.email}</p>
                 </div>
               </div>
+              <Button onClick={() => navigate('/profile')} className="w-full">
+                Редактировать профиль
+              </Button>
             </Card>
           </TabsContent>
         </Tabs>
