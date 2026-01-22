@@ -104,6 +104,22 @@ const Index = () => {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <Card 
+          onClick={() => navigate('/exam-prep')}
+          className="mb-6 p-6 bg-gradient-to-r from-yellow-50 via-orange-50 to-red-50 border-2 border-orange-300 cursor-pointer hover:shadow-2xl hover:shadow-orange-500/30 transition-all duration-300 hover:scale-[1.02]"
+        >
+          <div className="flex items-center gap-4">
+            <div className="w-16 h-16 bg-gradient-to-br from-orange-500 to-red-600 rounded-2xl flex items-center justify-center shadow-lg">
+              <span className="text-3xl">🎯</span>
+            </div>
+            <div className="flex-1">
+              <h3 className="text-xl font-bold text-gray-800 mb-1">Прогноз вопросов на экзамене</h3>
+              <p className="text-sm text-gray-600">AI анализирует твои материалы и предсказывает 20 самых вероятных вопросов</p>
+            </div>
+            <Icon name="ArrowRight" size={24} className="text-orange-600" />
+          </div>
+        </Card>
+
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
           <Card className="group relative overflow-hidden p-7 bg-white border-0 transition-all duration-300 hover:scale-105 hover:shadow-2xl hover:shadow-indigo-500/20">
             <div className="absolute inset-0 bg-gradient-to-br from-indigo-500 to-indigo-700 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
