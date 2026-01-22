@@ -64,6 +64,42 @@ const Materials = () => {
     }
   };
 
+  const compressImage = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          let width = img.width;
+          let height = img.height;
+          
+          const maxSize = 1500;
+          if (width > maxSize || height > maxSize) {
+            if (width > height) {
+              height = (height / width) * maxSize;
+              width = maxSize;
+            } else {
+              width = (width / height) * maxSize;
+              height = maxSize;
+            }
+          }
+          
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          ctx?.drawImage(img, 0, 0, width, height);
+          
+          resolve(canvas.toDataURL('image/jpeg', 0.8));
+        };
+        img.onerror = reject;
+        img.src = e.target?.result as string;
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  };
+
   const uploadImage = async (file: File) => {
     if (!file.type.startsWith('image/')) {
       toast({
@@ -77,51 +113,46 @@ const Materials = () => {
     setIsUploading(true);
 
     try {
-      const reader = new FileReader();
-      reader.onload = async (e) => {
-        const base64Image = e.target?.result as string;
+      const base64Image = await compressImage(file);
 
-        const token = authService.getToken();
-        const response = await fetch(API_URL, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          },
-          body: JSON.stringify({
-            image: base64Image
-          })
+      const token = authService.getToken();
+      const response = await fetch(API_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          image: base64Image
+        })
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        
+        toast({
+          title: "✅ Фото распознано!",
+          description: `Создан материал: ${data.material.title}`,
         });
 
-        if (response.ok) {
-          const data = await response.json();
-          
+        if (data.tasks && data.tasks.length > 0) {
           toast({
-            title: "✅ Фото распознано!",
-            description: `Создан материал: ${data.material.title}`,
-          });
-
-          if (data.tasks && data.tasks.length > 0) {
-            toast({
-              title: "📋 Найдены задачи!",
-              description: `Обнаружено ${data.tasks.length} задач(и) в тексте`,
-            });
-          }
-
-          await loadMaterials();
-        } else {
-          const errorData = await response.json();
-          toast({
-            title: "Ошибка",
-            description: errorData.error || "Не удалось загрузить фото",
-            variant: "destructive"
+            title: "📋 Найдены задачи!",
+            description: `Обнаружено ${data.tasks.length} задач(и) в тексте`,
           });
         }
 
-        setIsUploading(false);
-      };
+        await loadMaterials();
+      } else {
+        const errorData = await response.json();
+        toast({
+          title: "Ошибка",
+          description: errorData.error || "Не удалось загрузить фото",
+          variant: "destructive"
+        });
+      }
 
-      reader.readAsDataURL(file);
+      setIsUploading(false);
     } catch (error) {
       toast({
         title: "Ошибка",
