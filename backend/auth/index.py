@@ -190,6 +190,70 @@ def handler(event: dict, context) -> dict:
                     }
             finally:
                 conn.close()
+        
+        # POST /update_profile - Обновление профиля
+        elif action == 'update_profile':
+            auth_header = event.get('headers', {}).get('X-Authorization', '') or event.get('headers', {}).get('Authorization', '')
+            token = auth_header.replace('Bearer ', '')
+            
+            if not token:
+                return {
+                    'statusCode': 401,
+                    'headers': headers,
+                    'body': json.dumps({'error': 'Токен не предоставлен'})
+                }
+            
+            payload = verify_token(token)
+            
+            if not payload:
+                return {
+                    'statusCode': 401,
+                    'headers': headers,
+                    'body': json.dumps({'error': 'Недействительный токен'})
+                }
+            
+            full_name = body.get('full_name', '').strip()
+            university = body.get('university', '').strip()
+            faculty = body.get('faculty', '').strip()
+            course = body.get('course', '').strip()
+            
+            conn = get_db_connection()
+            try:
+                with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                    cur.execute("""
+                        UPDATE users
+                        SET full_name = %s, university = %s, faculty = %s, course = %s, onboarding_completed = true
+                        WHERE id = %s
+                        RETURNING id, email, full_name, university, faculty, course
+                    """, (full_name, university, faculty, course, payload['user_id']))
+                    
+                    user = cur.fetchone()
+                    conn.commit()
+                    
+                    if not user:
+                        return {
+                            'statusCode': 404,
+                            'headers': headers,
+                            'body': json.dumps({'error': 'Пользователь не найден'})
+                        }
+                    
+                    return {
+                        'statusCode': 200,
+                        'headers': headers,
+                        'body': json.dumps({
+                            'success': True,
+                            'user': {
+                                'id': user['id'],
+                                'email': user['email'],
+                                'full_name': user['full_name'],
+                                'university': user['university'],
+                                'faculty': user['faculty'],
+                                'course': user['course']
+                            }
+                        })
+                    }
+            finally:
+                conn.close()
     
     # GET /verify - Проверка токена
     elif method == 'GET':

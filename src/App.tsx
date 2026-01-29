@@ -7,6 +7,9 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Index from "./pages/Index";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
+import AuthNew from "./pages/AuthNew";
+import VKCallback from "./pages/VKCallback";
+import Onboarding from "./pages/Onboarding";
 import Profile from "./pages/Profile";
 import Materials from "./pages/Materials";
 import ExamPrep from "./pages/ExamPrep";
@@ -29,6 +32,9 @@ const App = () => (
           <Route path="/" element={<Index />} />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
+          <Route path="/auth" element={<AuthNew />} />
+          <Route path="/auth/vk" element={<VKCallback />} />
+          <Route path="/onboarding" element={<Onboarding />} />
           <Route path="/profile" element={<Profile />} />
           <Route path="/materials" element={<Materials />} />
           <Route path="/exam-prep" element={<ExamPrep />} />

@@ -1,0 +1,33 @@
+{
+  "tests": [
+    {
+      "name": "Send SMS code - invalid phone",
+      "method": "POST",
+      "path": "/",
+      "body": {
+        "action": "send_code",
+        "phone": "123"
+      },
+      "expectedStatus": 400,
+      "expectedBody": {
+        "error": "string"
+      },
+      "bodyMatcher": "partial"
+    },
+    {
+      "name": "Verify SMS code - invalid",
+      "method": "POST",
+      "path": "/",
+      "body": {
+        "action": "verify_code",
+        "phone": "+79991234567",
+        "code": "000000"
+      },
+      "expectedStatus": 400,
+      "expectedBody": {
+        "error": "string"
+      },
+      "bodyMatcher": "partial"
+    }
+  ]
+}
