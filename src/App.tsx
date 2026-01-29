@@ -18,6 +18,9 @@ import Assistant from "./pages/Assistant";
 import Calendar from "./pages/Calendar";
 import Sharing from "./pages/Sharing";
 import Analytics from "./pages/Analytics";
+import Privacy from "./pages/Privacy";
+import Terms from "./pages/Terms";
+import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -43,6 +46,9 @@ const App = () => (
           <Route path="/calendar" element={<Calendar />} />
           <Route path="/sharing" element={<Sharing />} />
           <Route path="/analytics" element={<Analytics />} />
+          <Route path="/privacy" element={<Privacy />} />
+          <Route path="/terms" element={<Terms />} />
+          <Route path="/settings" element={<Settings />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>

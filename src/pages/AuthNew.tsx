@@ -1,8 +1,9 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
 import Icon from '@/components/ui/icon';
 import { useToast } from '@/hooks/use-toast';
 
@@ -17,6 +18,7 @@ export default function AuthNew() {
   const [code, setCode] = useState('');
   const [loading, setLoading] = useState(false);
   const [testCode, setTestCode] = useState('');
+  const [agreedToTerms, setAgreedToTerms] = useState(false);
 
   const handleGuestMode = () => {
     // Временный гостевой токен
@@ -67,6 +69,15 @@ export default function AuthNew() {
   };
 
   const handleSendCode = async () => {
+    if (!agreedToTerms) {
+      toast({
+        variant: 'destructive',
+        title: 'Необходимо согласие',
+        description: 'Подтвердите согласие с условиями использования'
+      });
+      return;
+    }
+
     if (!phone || phone.length < 10) {
       toast({
         variant: 'destructive',
@@ -262,9 +273,6 @@ export default function AuthNew() {
               Попробовать без регистрации
             </Button>
 
-            <p className="text-xs text-center text-gray-500 mt-4">
-              Продолжая, вы принимаете условия использования и политику конфиденциальности
-            </p>
           </div>
         )}
 
@@ -285,10 +293,31 @@ export default function AuthNew() {
               />
             </div>
 
+            {/* Чекбокс согласия */}
+            <div className="flex items-start gap-3 p-4 bg-gray-50 rounded-xl border border-gray-200">
+              <Checkbox
+                id="terms"
+                checked={agreedToTerms}
+                onCheckedChange={(checked) => setAgreedToTerms(checked as boolean)}
+                className="mt-1"
+              />
+              <label htmlFor="terms" className="text-sm text-gray-700 cursor-pointer">
+                Я согласен(на) с{' '}
+                <Link to="/terms" className="text-purple-600 font-semibold hover:underline">
+                  Пользовательским соглашением
+                </Link>
+                {' '}и{' '}
+                <Link to="/privacy" className="text-purple-600 font-semibold hover:underline">
+                  Политикой конфиденциальности
+                </Link>
+                , включая согласие на отправку SMS-кодов для авторизации
+              </label>
+            </div>
+
             <Button
               onClick={handleSendCode}
-              disabled={loading}
-              className="w-full h-14 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white text-base font-semibold shadow-lg rounded-xl"
+              disabled={loading || !agreedToTerms}
+              className="w-full h-14 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white text-base font-semibold shadow-lg rounded-xl disabled:opacity-50"
             >
               {loading ? (
                 <Icon name="Loader2" size={20} className="animate-spin" />
