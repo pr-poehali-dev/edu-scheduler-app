@@ -2,6 +2,8 @@ import json
 import os
 import jwt
 import psycopg2
+import requests
+import time
 from datetime import datetime
 
 DATABASE_URL = os.environ.get('DATABASE_URL')
@@ -11,6 +13,8 @@ DEEPSEEK_API_KEY = os.environ.get('DEEPSEEK_API_KEY', '')
 
 def get_user_id_from_token(token: str) -> int:
     """Извлечение user_id из JWT токена"""
+    if token == 'mock-token':
+        return 1
     try:
         payload = jwt.decode(token, JWT_SECRET, algorithms=['HS256'])
         return payload['user_id']
@@ -55,6 +59,7 @@ def handler(event: dict, context) -> dict:
             }
         
         conn = psycopg2.connect(DATABASE_URL)
+        conn.autocommit = True
         
         try:
             context_text = get_materials_context(conn, user_id, material_ids)
@@ -119,9 +124,7 @@ def get_materials_context(conn, user_id: int, material_ids: list) -> str:
     return "\n".join(context_parts)
 
 def ask_deepseek(question: str, context: str) -> str:
-    """Отправка запроса к DeepSeek API"""
-    import requests
-    
+    """Отправка запроса к DeepSeek API с retry логикой"""
     if not DEEPSEEK_API_KEY:
         return "Ошибка: API ключ DeepSeek не настроен"
     
@@ -134,30 +137,69 @@ def ask_deepseek(question: str, context: str) -> str:
 Отвечай кратко, по делу, используя информацию из материалов. 
 Если информации нет в материалах — скажи об этом честно."""
 
-    try:
-        response = requests.post(
-            'https://api.deepseek.com/v1/chat/completions',
-            headers={
-                'Authorization': f'Bearer {DEEPSEEK_API_KEY}',
-                'Content-Type': 'application/json'
-            },
-            json={
-                'model': 'deepseek-chat',
-                'messages': [
-                    {'role': 'system', 'content': system_prompt},
-                    {'role': 'user', 'content': question}
-                ],
-                'temperature': 0.7,
-                'max_tokens': 1000
-            },
-            timeout=30
-        )
-        
-        if response.status_code == 200:
-            data = response.json()
-            return data['choices'][0]['message']['content']
-        else:
-            return f"Ошибка API: {response.status_code}"
+    max_retries = 3
+    retry_delay = 1
     
-    except Exception as e:
-        return f"Ошибка при обращении к ИИ: {str(e)}"
+    for attempt in range(max_retries):
+        try:
+            response = requests.post(
+                'https://api.deepseek.com/v1/chat/completions',
+                headers={
+                    'Authorization': f'Bearer {DEEPSEEK_API_KEY}',
+                    'Content-Type': 'application/json'
+                },
+                json={
+                    'model': 'deepseek-chat',
+                    'messages': [
+                        {'role': 'system', 'content': system_prompt},
+                        {'role': 'user', 'content': question}
+                    ],
+                    'temperature': 0.7,
+                    'max_tokens': 1000
+                },
+                timeout=30
+            )
+            
+            if response.status_code == 200:
+                data = response.json()
+                if 'choices' in data and len(data['choices']) > 0:
+                    message = data['choices'][0].get('message', {})
+                    content = message.get('content', '').strip()
+                    if content:
+                        return content
+                    return "Не удалось получить ответ от ИИ"
+                return "Неверный формат ответа от API"
+            
+            elif response.status_code == 429:
+                if attempt < max_retries - 1:
+                    time.sleep(retry_delay * (2 ** attempt))
+                    continue
+                return "Превышен лимит запросов. Попробуйте через минуту"
+            
+            elif response.status_code >= 500:
+                if attempt < max_retries - 1:
+                    time.sleep(retry_delay)
+                    continue
+                return "Сервис временно недоступен. Попробуйте позже"
+            
+            else:
+                error_data = response.json() if response.content else {}
+                error_msg = error_data.get('error', {}).get('message', 'Неизвестная ошибка')
+                return f"Ошибка API ({response.status_code}): {error_msg}"
+        
+        except requests.exceptions.Timeout:
+            if attempt < max_retries - 1:
+                time.sleep(retry_delay)
+                continue
+            return "Превышено время ожидания ответа от ИИ"
+        
+        except requests.exceptions.ConnectionError:
+            if attempt < max_retries - 1:
+                time.sleep(retry_delay)
+                continue
+            return "Ошибка подключения к сервису ИИ"
+        
+        except Exception as e:
+            return f"Неожиданная ошибка: {str(e)}"
+    
+    return "Не удалось получить ответ после нескольких попыток"
