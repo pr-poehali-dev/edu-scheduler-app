@@ -178,6 +178,9 @@ def ask_deepseek(question: str, context: str) -> str:
                     continue
                 return "Превышен лимит запросов. Попробуйте через минуту"
             
+            elif response.status_code == 402:
+                return "⚠️ Закончились средства на DeepSeek API. Пополните баланс на https://platform.deepseek.com/"
+            
             elif response.status_code >= 500:
                 if attempt < max_retries - 1:
                     time.sleep(retry_delay)
