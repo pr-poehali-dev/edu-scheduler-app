@@ -9,9 +9,7 @@ from datetime import datetime
 DATABASE_URL = os.environ.get('DATABASE_URL')
 SCHEMA_NAME = os.environ.get('MAIN_DB_SCHEMA', 'public')
 JWT_SECRET = os.environ.get('JWT_SECRET', 'your-secret-key')
-ARTEMOX_API_KEY = 'sk-Z7PQzAcoVmPrV3O7x4ZkvQ'
-ARTEMOX_EMAIL = 'xs83u8rff1_e4g1x5yrs@artemox.com'
-ARTEMOX_PASSWORD = 'WRythExibpCveiDMrEw7cd'
+ARTEMOX_API_KEY = 'dfa9bcfdaecab4ed775df38bab68a2884089d15cb41b03398013f5b9784fc42'
 
 def get_user_id_from_token(token: str) -> int:
     """Извлечение user_id из JWT токена"""
@@ -225,9 +223,9 @@ def ask_artemox(question: str, context: str) -> str:
             response = requests.post(
                 'https://api.artemox.com/v1/chat/completions',
                 headers={
+                    'Authorization': f'Bearer {ARTEMOX_API_KEY}',
                     'Content-Type': 'application/json'
                 },
-                auth=(ARTEMOX_EMAIL, ARTEMOX_PASSWORD),
                 json={
                     'model': 'deepseek-chat',
                     'messages': [
