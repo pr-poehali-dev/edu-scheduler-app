@@ -220,6 +220,7 @@ def ask_artemox(question: str, context: str) -> str:
     
     for attempt in range(max_retries):
         try:
+            print(f"[AI-ASSISTANT] Отправка запроса к Artemox API (попытка {attempt + 1}/{max_retries})")
             response = requests.post(
                 'https://api.artemox.com/v1/chat/completions',
                 headers={
@@ -235,8 +236,10 @@ def ask_artemox(question: str, context: str) -> str:
                     'temperature': 0.7,
                     'max_tokens': 1000
                 },
-                timeout=30
+                timeout=60
             )
+            
+            print(f"[AI-ASSISTANT] Ответ от Artemox API: status={response.status_code}, body_length={len(response.text)}")
             
             if response.status_code == 200:
                 data = response.json()
@@ -266,21 +269,25 @@ def ask_artemox(question: str, context: str) -> str:
             else:
                 error_data = response.json() if response.content else {}
                 error_msg = error_data.get('error', {}).get('message', 'Неизвестная ошибка')
+                print(f"[AI-ASSISTANT] Ошибка API: status={response.status_code}, error={error_msg}, response={response.text[:500]}")
                 return f"Ошибка API ({response.status_code}): {error_msg}"
         
         except requests.exceptions.Timeout:
+            print(f"[AI-ASSISTANT] Timeout на попытке {attempt + 1}")
             if attempt < max_retries - 1:
                 time.sleep(retry_delay)
                 continue
             return "Превышено время ожидания ответа от ИИ"
         
-        except requests.exceptions.ConnectionError:
+        except requests.exceptions.ConnectionError as e:
+            print(f"[AI-ASSISTANT] ConnectionError на попытке {attempt + 1}: {str(e)}")
             if attempt < max_retries - 1:
                 time.sleep(retry_delay)
                 continue
             return "Ошибка подключения к сервису ИИ"
         
         except Exception as e:
+            print(f"[AI-ASSISTANT] Неожиданная ошибка: {type(e).__name__}: {str(e)}")
             return f"Неожиданная ошибка: {str(e)}"
     
     return "Не удалось получить ответ после нескольких попыток"
