@@ -8,7 +8,7 @@ from datetime import datetime
 import psycopg2
 from psycopg2.extras import RealDictCursor
 import jwt
-from openai import OpenAI
+from openai import OpenAI  # Используется совместимый клиент для Deepseek
 
 
 def get_db_connection():
@@ -50,28 +50,29 @@ def upload_to_s3(image_data: bytes, filename: str) -> str:
 
 
 def recognize_text_from_image(image_url: str) -> dict:
-    """Использует OpenAI GPT-4 Vision для распознавания текста с изображений"""
-    openai_key = os.environ.get('OPENAI_API_KEY')
+    """Использует Deepseek Vision для распознавания текста с изображений"""
+    deepseek_key = os.environ.get('DEEPSEEK_API_KEY')
     
-    if not openai_key:
-        print("[MATERIALS] OPENAI_API_KEY не найден")
+    if not deepseek_key:
+        print("[MATERIALS] DEEPSEEK_API_KEY не найден")
         return {
             'text': 'Ключ API не настроен',
-            'summary': 'Настройте OPENAI_API_KEY для распознавания',
+            'summary': 'Настройте DEEPSEEK_API_KEY для распознавания',
             'subject': 'Общее',
             'title': 'Материал без распознавания',
             'tasks': []
         }
     
     try:
-        print(f"[MATERIALS] Начинаю распознавание изображения через OpenAI Vision: {image_url}")
+        print(f"[MATERIALS] Начинаю распознавание изображения через Deepseek Vision: {image_url}")
         client = OpenAI(
-            api_key=openai_key,
-            timeout=25.0
+            api_key=deepseek_key,
+            base_url="https://api.deepseek.com",
+            timeout=30.0
         )
         
         response = client.chat.completions.create(
-            model="gpt-4o-mini",
+            model="deepseek-chat",
             messages=[
                 {
                     "role": "user",
@@ -110,7 +111,16 @@ def recognize_text_from_image(image_url: str) -> dict:
             response_format={"type": "json_object"}
         )
         
-        result = json.loads(response.choices[0].message.content)
+        content = response.choices[0].message.content
+        print(f"[MATERIALS] Получен ответ от Deepseek: {content[:200]}...")
+        
+        # Deepseek может вернуть JSON в markdown блоке, очищаем
+        if '```json' in content:
+            content = content.split('```json')[1].split('```')[0].strip()
+        elif '```' in content:
+            content = content.split('```')[1].split('```')[0].strip()
+        
+        result = json.loads(content)
         print(f"[MATERIALS] Распознавание завершено: {result.get('title')}")
         return result
         
