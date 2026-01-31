@@ -128,13 +128,14 @@ const Assistant = () => {
         
         toast({
           title: 'Требуется подписка',
-          description: 'Оформите подписку для доступа к ИИ',
-          variant: 'destructive',
-          action: {
-            label: 'Подробнее',
-            onClick: () => navigate('/subscription')
-          }
+          description: 'Оформите подписку для доступа к ИИ. Перейдите в раздел "Подписка".',
+          variant: 'destructive'
         });
+        
+        // Перенаправляем на страницу подписки через 2 секунды
+        setTimeout(() => {
+          navigate('/subscription');
+        }, 2000);
       } else {
         toast({
           title: 'Ошибка',
