@@ -50,23 +50,35 @@ def upload_to_s3(image_data: bytes, filename: str) -> str:
 
 
 def recognize_text_from_image(image_url: str) -> dict:
-    """Использует OpenAI GPT-4 Vision для распознавания, затем DeepSeek для анализа"""
+    """Использует OpenAI GPT-4 Vision для распознавания текста с изображений"""
     openai_key = os.environ.get('OPENAI_API_KEY')
     
     if not openai_key:
-        raise ValueError("Требуется OPENAI_API_KEY для распознавания изображений")
+        print("[MATERIALS] OPENAI_API_KEY не найден")
+        return {
+            'text': 'Ключ API не настроен',
+            'summary': 'Настройте OPENAI_API_KEY для распознавания',
+            'subject': 'Общее',
+            'title': 'Материал без распознавания',
+            'tasks': []
+        }
     
-    client = OpenAI(api_key=openai_key)
-    
-    response = client.chat.completions.create(
-        model="gpt-4o-mini",
-        messages=[
-            {
-                "role": "user",
-                "content": [
-                    {
-                        "type": "text",
-                        "text": """Ты помощник студента. Проанализируй это изображение (доска/конспект/учебный материал).
+    try:
+        print(f"[MATERIALS] Начинаю распознавание изображения через OpenAI Vision: {image_url}")
+        client = OpenAI(
+            api_key=openai_key,
+            timeout=25.0
+        )
+        
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": """Ты помощник студента. Проанализируй это изображение (доска/конспект/учебный материал).
 
 Верни JSON в таком формате:
 {
@@ -86,20 +98,31 @@ def recognize_text_from_image(image_url: str) -> dict:
 - Если нет заданий - tasks: []
 - Весь текст распознавай максимально точно
 """
-                    },
-                    {
-                        "type": "image_url",
-                        "image_url": {"url": image_url}
-                    }
-                ]
-            }
-        ],
-        max_tokens=2000,
-        response_format={"type": "json_object"}
-    )
-    
-    result = json.loads(response.choices[0].message.content)
-    return result
+                        },
+                        {
+                            "type": "image_url",
+                            "image_url": {"url": image_url}
+                        }
+                    ]
+                }
+            ],
+            max_tokens=2000,
+            response_format={"type": "json_object"}
+        )
+        
+        result = json.loads(response.choices[0].message.content)
+        print(f"[MATERIALS] Распознавание завершено: {result.get('title')}")
+        return result
+        
+    except Exception as e:
+        print(f"[MATERIALS] Ошибка распознавания: {str(e)}")
+        return {
+            'text': f'Ошибка распознавания: {str(e)}',
+            'summary': 'Не удалось распознать изображение',
+            'subject': 'Общее',
+            'title': 'Материал (ошибка распознавания)',
+            'tasks': []
+        }
 
 
 def handler(event: dict, context) -> dict:
@@ -144,61 +167,82 @@ def handler(event: dict, context) -> dict:
     
     # POST /upload - Загрузка и распознавание фото
     if method == 'POST':
-        body = json.loads(event.get('body', '{}'))
-        image_base64 = body.get('image')
-        
-        if not image_base64:
-            return {
-                'statusCode': 400,
-                'headers': headers,
-                'body': json.dumps({'error': 'Изображение не предоставлено'})
-            }
-        
         try:
-            image_data = base64.b64decode(image_base64.split(',')[1] if ',' in image_base64 else image_base64)
-        except:
-            return {
-                'statusCode': 400,
-                'headers': headers,
-                'body': json.dumps({'error': 'Неверный формат изображения'})
-            }
-        
-        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-        filename = f"{user_id}_{timestamp}.jpg"
-        
-        image_url = upload_to_s3(image_data, filename)
-        
-        recognition_result = recognize_text_from_image(image_url)
-        
-        conn = get_db_connection()
-        try:
-            with conn.cursor(cursor_factory=RealDictCursor) as cur:
-                cur.execute("""
-                    INSERT INTO materials (user_id, title, subject, image_url, recognized_text, summary)
-                    VALUES (%s, %s, %s, %s, %s, %s)
-                    RETURNING id, title, subject, image_url, recognized_text, summary, created_at
-                """, (
-                    user_id,
-                    recognition_result.get('title', 'Без названия'),
-                    recognition_result.get('subject'),
-                    image_url,
-                    recognition_result.get('text'),
-                    recognition_result.get('summary')
-                ))
-                
-                material = cur.fetchone()
-                conn.commit()
-                
+            body = json.loads(event.get('body', '{}'))
+            image_base64 = body.get('image')
+            
+            if not image_base64:
                 return {
-                    'statusCode': 201,
+                    'statusCode': 400,
                     'headers': headers,
-                    'body': json.dumps({
-                        'material': dict(material),
-                        'tasks': recognition_result.get('tasks', [])
-                    }, default=str)
+                    'body': json.dumps({'error': 'Изображение не предоставлено'})
                 }
-        finally:
-            conn.close()
+            
+            print(f"[MATERIALS] Начинаю обработку изображения для пользователя {user_id}")
+            
+            try:
+                image_data = base64.b64decode(image_base64.split(',')[1] if ',' in image_base64 else image_base64)
+                print(f"[MATERIALS] Изображение декодировано, размер: {len(image_data)} байт")
+            except Exception as e:
+                print(f"[MATERIALS] Ошибка декодирования: {str(e)}")
+                return {
+                    'statusCode': 400,
+                    'headers': headers,
+                    'body': json.dumps({'error': 'Неверный формат изображения'})
+                }
+            
+            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+            filename = f"{user_id}_{timestamp}.jpg"
+            
+            print(f"[MATERIALS] Загружаю в S3: {filename}")
+            image_url = upload_to_s3(image_data, filename)
+            print(f"[MATERIALS] Загружено в S3: {image_url}")
+            
+            print(f"[MATERIALS] Запускаю распознавание")
+            recognition_result = recognize_text_from_image(image_url)
+            
+            conn = get_db_connection()
+            try:
+                with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                    print(f"[MATERIALS] Сохраняю в БД")
+                    cur.execute("""
+                        INSERT INTO materials (user_id, title, subject, image_url, recognized_text, summary)
+                        VALUES (%s, %s, %s, %s, %s, %s)
+                        RETURNING id, title, subject, image_url, recognized_text, summary, created_at
+                    """, (
+                        user_id,
+                        recognition_result.get('title', 'Без названия'),
+                        recognition_result.get('subject'),
+                        image_url,
+                        recognition_result.get('text'),
+                        recognition_result.get('summary')
+                    ))
+                    
+                    material = cur.fetchone()
+                    conn.commit()
+                    
+                    print(f"[MATERIALS] Материал создан: ID={material['id']}")
+                    
+                    return {
+                        'statusCode': 201,
+                        'headers': headers,
+                        'body': json.dumps({
+                            'material': dict(material),
+                            'tasks': recognition_result.get('tasks', [])
+                        }, default=str)
+                    }
+            finally:
+                conn.close()
+                
+        except Exception as e:
+            print(f"[MATERIALS] Критическая ошибка: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            return {
+                'statusCode': 500,
+                'headers': headers,
+                'body': json.dumps({'error': f'Ошибка обработки: {str(e)}'})
+            }
     
     # GET /materials - Получить все материалы пользователя
     elif method == 'GET':
