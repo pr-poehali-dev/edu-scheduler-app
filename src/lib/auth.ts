@@ -14,6 +14,10 @@ export const authService = {
     return localStorage.getItem('token');
   },
 
+  setToken: (token: string): void => {
+    localStorage.setItem('token', token);
+  },
+
   getUser: (): User | null => {
     const userStr = localStorage.getItem('user');
     if (!userStr) return null;
@@ -22,6 +26,10 @@ export const authService = {
     } catch {
       return null;
     }
+  },
+
+  setUser: (user: User): void => {
+    localStorage.setItem('user', JSON.stringify(user));
   },
 
   isAuthenticated: (): boolean => {
