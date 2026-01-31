@@ -302,6 +302,12 @@ const Subscription = () => {
         {/* Тарифы */}
         <div className="mb-12">
           <h2 className="text-2xl font-bold text-gray-800 mb-6">Выберите подписку</h2>
+          <div className="bg-blue-50 border-l-4 border-blue-500 p-4 rounded-lg mb-6">
+            <p className="text-sm text-blue-900">
+              <Icon name="Info" size={16} className="inline mr-1" />
+              <strong>Важно:</strong> Подписка не продлевается автоматически. Для продления необходимо повторить оплату после окончания срока действия.
+            </p>
+          </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {plans.map((plan) => {
               const badge = getPlanBadge(plan.id);
@@ -352,6 +358,11 @@ const Subscription = () => {
                       <Icon name="Check" size={20} className="text-green-500" />
                       <span className="text-sm text-gray-700">Поддержка 24/7</span>
                     </div>
+                  </div>
+
+                  <div className="text-xs text-gray-500 mb-4 space-y-1">
+                    <p>• Подписка НЕ продлевается автоматически</p>
+                    <p>• Возврат возможен в течение 14 дней при отсутствии использования</p>
                   </div>
 
                   <Button

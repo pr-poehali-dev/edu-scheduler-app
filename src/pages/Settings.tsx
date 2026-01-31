@@ -309,6 +309,28 @@ export default function Settings() {
             </p>
           </Card>
 
+          {/* Информация о подписке и возврате */}
+          <Card className="p-6 bg-blue-50 border-2 border-blue-200">
+            <div className="flex items-center gap-3 mb-4">
+              <Icon name="CreditCard" size={24} className="text-blue-600" />
+              <h2 className="text-lg font-bold text-gray-900">Подписка и возврат средств</h2>
+            </div>
+            <div className="space-y-3 text-sm text-gray-700">
+              <div className="flex items-start gap-2">
+                <Icon name="Info" size={16} className="text-blue-600 mt-0.5 flex-shrink-0" />
+                <p><strong>Подписка не продлевается автоматически.</strong> Для продолжения использования ИИ-ассистента необходимо повторно оформить подписку после окончания срока действия.</p>
+              </div>
+              <div className="flex items-start gap-2">
+                <Icon name="RotateCcw" size={16} className="text-blue-600 mt-0.5 flex-shrink-0" />
+                <p><strong>Возврат средств возможен в течение 14 дней</strong> с момента оплаты при условии отсутствия использования ИИ-ассистента. Для запроса возврата обратитесь в службу поддержки.</p>
+              </div>
+              <div className="flex items-start gap-2">
+                <Icon name="Mail" size={16} className="text-blue-600 mt-0.5 flex-shrink-0" />
+                <p>Служба поддержки: <a href="mailto:support@studyfay.ru" className="text-purple-600 underline">support@studyfay.ru</a></p>
+              </div>
+            </div>
+          </Card>
+
           {/* Кнопка сохранения */}
           <div className="flex gap-4">
             <Button

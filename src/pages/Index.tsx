@@ -945,6 +945,20 @@ const Index = () => {
           </TabsContent>
         </Tabs>
       </main>
+
+      {/* Футер с юридическими документами */}
+      <footer className="bg-white/70 backdrop-blur-xl border-t border-purple-200/50 mt-8">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+            <p className="text-sm text-gray-600">© 2024 Studyfay. Все права защищены.</p>
+            <div className="flex items-center gap-4 text-sm">
+              <a href="/privacy" className="text-purple-600 hover:underline">Политика конфиденциальности</a>
+              <span className="text-gray-400">•</span>
+              <a href="/terms" className="text-purple-600 hover:underline">Пользовательское соглашение</a>
+            </div>
+          </div>
+        </div>
+      </footer>
     </div>
   );
 };
