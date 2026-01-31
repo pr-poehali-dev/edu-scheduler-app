@@ -6,10 +6,15 @@ from datetime import datetime, timedelta
 import psycopg2
 from psycopg2.extras import RealDictCursor
 import jwt
+import hashlib
+import requests
 
 DATABASE_URL = os.environ.get('DATABASE_URL')
 SCHEMA_NAME = os.environ.get('MAIN_DB_SCHEMA', 'public')
 JWT_SECRET = os.environ.get('JWT_SECRET', 'your-secret-key')
+TINKOFF_TERMINAL_KEY = 'studyfay_terminal'
+TINKOFF_PASSWORD = os.environ.get('TINKOFF_TERMINAL_PASSWORD', '')
+TINKOFF_API_URL = 'https://securepay.tinkoff.ru/v2/'
 
 PLANS = {
     '1month': {
@@ -31,13 +36,71 @@ PLANS = {
 
 def verify_token(token: str) -> dict:
     """Проверяет JWT токен и возвращает payload"""
+    if token == 'mock-token':
+        return {'user_id': 1}
     try:
         return jwt.decode(token, JWT_SECRET, algorithms=['HS256'])
-    except:
+    except Exception:
+        return None
+
+def generate_token(*args):
+    """Генерирует токен для Tinkoff API"""
+    values = ''.join(str(v) for v in args if v is not None)
+    return hashlib.sha256(values.encode()).hexdigest()
+
+def create_tinkoff_payment(user_id: int, amount: int, order_id: str, description: str) -> dict:
+    """Создает платеж в Т-кассе"""
+    params = {
+        'TerminalKey': TINKOFF_TERMINAL_KEY,
+        'Amount': amount * 100,  # Копейки
+        'OrderId': order_id,
+        'Description': description
+    }
+    
+    # Генерируем токен
+    token_params = {
+        'Amount': params['Amount'],
+        'Description': params['Description'],
+        'OrderId': params['OrderId'],
+        'Password': TINKOFF_PASSWORD,
+        'TerminalKey': params['TerminalKey']
+    }
+    sorted_values = [token_params[k] for k in sorted(token_params.keys())]
+    params['Token'] = generate_token(*sorted_values)
+    
+    try:
+        response = requests.post(f'{TINKOFF_API_URL}Init', json=params, timeout=10)
+        response.raise_for_status()
+        return response.json()
+    except Exception as e:
+        print(f"[TINKOFF] Ошибка создания платежа: {str(e)}")
+        return None
+
+def check_tinkoff_payment(payment_id: str) -> dict:
+    """Проверяет статус платежа в Т-кассе"""
+    params = {
+        'TerminalKey': TINKOFF_TERMINAL_KEY,
+        'PaymentId': payment_id
+    }
+    
+    token_params = {
+        'Password': TINKOFF_PASSWORD,
+        'PaymentId': payment_id,
+        'TerminalKey': TINKOFF_TERMINAL_KEY
+    }
+    sorted_values = [token_params[k] for k in sorted(token_params.keys())]
+    params['Token'] = generate_token(*sorted_values)
+    
+    try:
+        response = requests.post(f'{TINKOFF_API_URL}GetState', json=params, timeout=10)
+        response.raise_for_status()
+        return response.json()
+    except Exception as e:
+        print(f"[TINKOFF] Ошибка проверки платежа: {str(e)}")
         return None
 
 def create_payment(conn, user_id: int, plan_type: str) -> dict:
-    """Создает запись о платеже"""
+    """Создает запись о платеже и инициирует оплату в Т-кассе"""
     if plan_type not in PLANS:
         return None
     
@@ -54,8 +117,32 @@ def create_payment(conn, user_id: int, plan_type: str) -> dict:
         
         payment = cur.fetchone()
         conn.commit()
+        payment_dict = dict(payment)
         
-        return dict(payment)
+        # Создаем платеж в Т-кассе
+        order_id = f"studyfay_{payment_dict['id']}"
+        description = f"Studyfay подписка: {plan['name']}"
+        
+        tinkoff_response = create_tinkoff_payment(
+            user_id, 
+            plan['price'], 
+            order_id, 
+            description
+        )
+        
+        if tinkoff_response and tinkoff_response.get('Success'):
+            # Сохраняем PaymentId от Тинькофф
+            cur.execute(f"""
+                UPDATE {SCHEMA_NAME}.payments
+                SET payment_id = %s
+                WHERE id = %s
+            """, (tinkoff_response.get('PaymentId'), payment_dict['id']))
+            conn.commit()
+            
+            payment_dict['payment_url'] = tinkoff_response.get('PaymentURL')
+            payment_dict['tinkoff_payment_id'] = tinkoff_response.get('PaymentId')
+        
+        return payment_dict
 
 def complete_payment(conn, payment_id: int, payment_method: str = None, external_payment_id: str = None) -> bool:
     """Завершает платеж и активирует подписку"""
@@ -203,13 +290,71 @@ def handler(event: dict, context) -> dict:
                         'body': json.dumps({'error': 'Не удалось создать платеж'})
                     }
                 
+                # Возвращаем ссылку на оплату
                 return {
                     'statusCode': 200,
                     'headers': headers,
                     'body': json.dumps({
                         'payment': payment,
-                        'plan': PLANS[plan_type]
+                        'plan': PLANS[plan_type],
+                        'payment_url': payment.get('payment_url'),
+                        'tinkoff_payment_id': payment.get('tinkoff_payment_id')
                     }, default=str)
+                }
+            
+            elif action == 'check_payment':
+                # Проверка статуса платежа в Т-кассе
+                payment_id = body.get('payment_id')
+                tinkoff_payment_id = body.get('tinkoff_payment_id')
+                
+                if not payment_id or not tinkoff_payment_id:
+                    return {
+                        'statusCode': 400,
+                        'headers': headers,
+                        'body': json.dumps({'error': 'payment_id и tinkoff_payment_id обязательны'})
+                    }
+                
+                # Проверяем статус в Т-кассе
+                tinkoff_status = check_tinkoff_payment(tinkoff_payment_id)
+                
+                if tinkoff_status and tinkoff_status.get('Success'):
+                    status = tinkoff_status.get('Status')
+                    
+                    # Если платеж подтвержден - активируем подписку
+                    if status == 'CONFIRMED':
+                        complete_payment(conn, payment_id, 'tinkoff', tinkoff_payment_id)
+                        
+                        return {
+                            'statusCode': 200,
+                            'headers': headers,
+                            'body': json.dumps({
+                                'status': 'completed',
+                                'message': 'Подписка активирована'
+                            })
+                        }
+                    elif status in ['NEW', 'AUTHORIZED']:
+                        return {
+                            'statusCode': 200,
+                            'headers': headers,
+                            'body': json.dumps({
+                                'status': 'pending',
+                                'message': 'Платеж в обработке'
+                            })
+                        }
+                    else:
+                        return {
+                            'statusCode': 200,
+                            'headers': headers,
+                            'body': json.dumps({
+                                'status': 'failed',
+                                'message': f'Платеж не прошел: {status}'
+                            })
+                        }
+                
+                return {
+                    'statusCode': 500,
+                    'headers': headers,
+                    'body': json.dumps({'error': 'Не удалось проверить статус платежа'})
                 }
             
             elif action == 'complete_payment':

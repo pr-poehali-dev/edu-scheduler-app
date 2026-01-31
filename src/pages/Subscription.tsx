@@ -113,7 +113,7 @@ const Subscription = () => {
     try {
       const token = authService.getToken();
       
-      // Создаем платеж
+      // Создаем платеж в Т-кассе
       const createResponse = await fetch(PAYMENTS_URL, {
         method: 'POST',
         headers: {
@@ -132,38 +132,86 @@ const Subscription = () => {
 
       const createData = await createResponse.json();
       const paymentId = createData.payment.id;
+      const paymentUrl = createData.payment_url;
+      const tinkoffPaymentId = createData.tinkoff_payment_id;
+
+      if (!paymentUrl || !tinkoffPaymentId) {
+        throw new Error('Ошибка при создании платежа в Т-кассе');
+      }
 
       toast({
-        title: '💳 Платеж создан',
-        description: 'Переходим к оплате...'
+        title: '💳 Переход к оплате',
+        description: 'Открываем страницу оплаты Т-касса...'
       });
 
-      // В реальном приложении здесь должна быть интеграция с платежной системой
-      // Для демо автоматически завершаем платеж
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      // Открываем страницу оплаты в новой вкладке
+      const paymentWindow = window.open(paymentUrl, '_blank');
 
-      const completeResponse = await fetch(PAYMENTS_URL, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          action: 'complete_payment',
-          payment_id: paymentId
-        })
-      });
+      // Проверяем статус платежа каждые 3 секунды
+      const checkInterval = setInterval(async () => {
+        try {
+          const checkResponse = await fetch(PAYMENTS_URL, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({
+              action: 'check_payment',
+              payment_id: paymentId,
+              tinkoff_payment_id: tinkoffPaymentId
+            })
+          });
 
-      if (completeResponse.ok) {
-        toast({
-          title: '🎉 Подписка активирована!',
-          description: 'Теперь у вас есть доступ к ИИ-ассистенту'
-        });
+          if (checkResponse.ok) {
+            const checkData = await checkResponse.json();
 
-        await loadData();
-      } else {
-        throw new Error('Не удалось активировать подписку');
-      }
+            if (checkData.status === 'completed') {
+              clearInterval(checkInterval);
+              
+              if (paymentWindow && !paymentWindow.closed) {
+                paymentWindow.close();
+              }
+
+              toast({
+                title: '🎉 Подписка активирована!',
+                description: 'Теперь у вас есть доступ к ИИ-ассистенту'
+              });
+
+              await loadData();
+              setIsProcessing(false);
+              setSelectedPlan(null);
+            } else if (checkData.status === 'failed') {
+              clearInterval(checkInterval);
+
+              toast({
+                title: 'Оплата не прошла',
+                description: checkData.message || 'Попробуйте снова',
+                variant: 'destructive'
+              });
+
+              setIsProcessing(false);
+              setSelectedPlan(null);
+            }
+          }
+        } catch (error) {
+          console.error('Ошибка проверки платежа:', error);
+        }
+      }, 3000);
+
+      // Останавливаем проверку через 10 минут
+      setTimeout(() => {
+        clearInterval(checkInterval);
+        if (isProcessing) {
+          setIsProcessing(false);
+          setSelectedPlan(null);
+          toast({
+            title: 'Время ожидания истекло',
+            description: 'Проверьте статус платежа позже',
+            variant: 'destructive'
+          });
+        }
+      }, 600000);
 
     } catch (error) {
       toast({
@@ -171,7 +219,6 @@ const Subscription = () => {
         description: error instanceof Error ? error.message : 'Не удалось оформить подписку',
         variant: 'destructive'
       });
-    } finally {
       setIsProcessing(false);
       setSelectedPlan(null);
     }
