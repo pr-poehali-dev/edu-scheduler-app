@@ -198,13 +198,13 @@ export default function AuthNew() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 flex items-center justify-center p-4 sm:p-6">
       <div className="absolute inset-0 overflow-hidden">
         <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-white/10 rounded-full blur-3xl animate-pulse"></div>
         <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-white/10 rounded-full blur-3xl animate-pulse delay-1000"></div>
       </div>
 
-      <Card className="relative z-10 w-full max-w-md p-8 bg-white/95 backdrop-blur-xl border-0 shadow-2xl rounded-3xl">
+      <Card className="relative z-10 w-full max-w-md p-6 sm:p-8 bg-white/95 backdrop-blur-xl border-0 shadow-2xl rounded-3xl">
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-br from-indigo-600 via-purple-600 to-pink-600 rounded-3xl shadow-xl mb-4">
             <Icon name="GraduationCap" size={40} className="text-white" />

@@ -100,5 +100,152 @@
 
   body {
     @apply bg-background text-foreground;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* Улучшения для мобильных устройств */
+  html {
+    -webkit-tap-highlight-color: transparent;
+    -webkit-text-size-adjust: 100%;
+    touch-action: manipulation;
+  }
+
+  /* Безопасная зона для устройств с вырезами (iPhone X+, etc) */
+  body {
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+  }
+
+  /* Улучшение кликабельности на touch устройствах */
+  button,
+  a,
+  [role="button"] {
+    -webkit-tap-highlight-color: rgba(0, 0, 0, 0);
+    touch-action: manipulation;
+  }
+
+  /* Предотвращение зума при фокусе на input на iOS */
+  input,
+  textarea,
+  select {
+    font-size: 16px;
+  }
+
+  /* Скрытие скроллбара на мобильных */
+  @media (max-width: 768px) {
+    ::-webkit-scrollbar {
+      display: none;
+    }
+    * {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
+  }
+
+  /* Улучшение читаемости на маленьких экранах */
+  @media (max-width: 640px) {
+    .card-grid {
+      grid-template-columns: 1fr;
+    }
+
+    /* Увеличенные области клика для мобильных */
+    button,
+    a,
+    [role="button"] {
+      min-height: 44px;
+      min-width: 44px;
+    }
+  }
+
+  /* Оптимизация для landscape на мобильных */
+  @media (max-height: 500px) and (orientation: landscape) {
+    header {
+      padding-top: 0.5rem;
+      padding-bottom: 0.5rem;
+    }
+  }
+
+  /* Поддержка реальной высоты viewport для iOS */
+  .is-mobile .min-h-screen {
+    min-height: 100vh;
+    min-height: calc(var(--vh, 1vh) * 100);
+  }
+
+  /* Плавная прокрутка для iOS */
+  .is-ios {
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Отключение подсветки при долгом нажатии */
+  .is-mobile * {
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+
+  /* Разрешаем выделение для input и textarea */
+  .is-mobile input,
+  .is-mobile textarea {
+    -webkit-user-select: text;
+    user-select: text;
+  }
+
+  /* Увеличенные touch targets на мобильных */
+  @media (max-width: 768px) {
+    button:not(.no-mobile-padding),
+    [role="button"]:not(.no-mobile-padding) {
+      padding: 0.75rem 1rem;
+    }
+
+    /* Улучшенные отступы для карточек на мобильных */
+    .card-mobile-spacing {
+      padding: 1rem;
+    }
+
+    /* Sticky хедер на мобильных */
+    header {
+      position: sticky;
+      top: 0;
+      z-index: 50;
+    }
+
+    /* Фиксированная нижняя навигация на очень маленьких экранах */
+    @media (max-height: 600px) {
+      .bottom-nav {
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        background: white;
+        border-top: 1px solid #e5e7eb;
+        padding: 0.5rem;
+        z-index: 50;
+      }
+    }
+  }
+
+  /* Улучшение модальных окон на мобильных */
+  @media (max-width: 640px) {
+    [role="dialog"],
+    .modal {
+      max-width: calc(100vw - 2rem);
+      max-height: calc(100vh - 4rem);
+      margin: 1rem;
+    }
+  }
+
+  /* Оптимизация форм на мобильных */
+  @media (max-width: 768px) {
+    input[type="text"],
+    input[type="email"],
+    input[type="password"],
+    input[type="tel"],
+    textarea,
+    select {
+      font-size: 16px !important; /* Предотвращаем зум на iOS */
+    }
   }
 }
