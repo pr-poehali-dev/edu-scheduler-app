@@ -22,6 +22,7 @@ import Privacy from "./pages/Privacy";
 import Terms from "./pages/Terms";
 import Settings from "./pages/Settings";
 import Subscription from "./pages/Subscription";
+import PaymentSetup from "./pages/PaymentSetup";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -51,6 +52,7 @@ const App = () => (
           <Route path="/terms" element={<Terms />} />
           <Route path="/settings" element={<Settings />} />
           <Route path="/subscription" element={<Subscription />} />
+          <Route path="/payment-setup" element={<PaymentSetup />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
