@@ -31,7 +31,7 @@ def check_subscription_access(conn, user_id: int) -> dict:
     cursor = conn.cursor()
     cursor.execute(f'''
         SELECT subscription_type, subscription_expires_at, 
-               ai_tokens_used, ai_tokens_reset_at
+               ai_tokens_used, ai_tokens_reset_at, ai_tokens_limit
         FROM {SCHEMA_NAME}.users
         WHERE id = %s
     ''', (user_id,))
@@ -42,8 +42,12 @@ def check_subscription_access(conn, user_id: int) -> dict:
     if not row:
         return {'has_access': False, 'reason': 'user_not_found', 'tokens_used': 0, 'tokens_limit': 0}
     
-    sub_type, expires_at, tokens_used, reset_at = row
+    sub_type, expires_at, tokens_used, reset_at, tokens_limit = row
     now = datetime.now()
+    
+    # Если лимит не установлен, ставим по умолчанию 50000
+    if tokens_limit is None:
+        tokens_limit = 50000
     
     # Проверяем, нужно ли сбросить счетчик токенов
     if reset_at and reset_at < now:
@@ -51,18 +55,19 @@ def check_subscription_access(conn, user_id: int) -> dict:
         cursor.execute(f'''
             UPDATE {SCHEMA_NAME}.users
             SET ai_tokens_used = 0,
-                ai_tokens_reset_at = CURRENT_TIMESTAMP + INTERVAL '1 month'
+                ai_tokens_reset_at = CURRENT_TIMESTAMP + INTERVAL '1 month',
+                ai_tokens_limit = 50000
             WHERE id = %s
         ''', (user_id,))
         conn.commit()
         cursor.close()
         tokens_used = 0
+        tokens_limit = 50000
     
     # Проверяем премиум подписку
     if sub_type == 'premium':
         if expires_at and expires_at > now:
-            # Premium: 100,000 токенов в месяц
-            tokens_limit = 100000
+            # Premium: персональный лимит (по умолчанию 50,000 + докупленные)
             if tokens_used >= tokens_limit:
                 return {
                     'has_access': False, 
@@ -175,11 +180,15 @@ def handler(event: dict, context) -> dict:
             # Получаем обновленные данные о токенах
             access_updated = check_subscription_access(conn, user_id)
             
+            # Примерный расчет: 1 токен ≈ 1.3 русских слов
+            words_remaining = int((access_updated.get('tokens_limit', 0) - access_updated.get('tokens_used', 0)) * 1.3)
+            
             answer_data = json.dumps({
                 'answer': answer,
                 'tokens_used': tokens_used,
                 'total_tokens_used': access_updated.get('tokens_used', 0),
-                'tokens_limit': access_updated.get('tokens_limit', 0)
+                'tokens_limit': access_updated.get('tokens_limit', 0),
+                'words_remaining': words_remaining
             })
             
             return {

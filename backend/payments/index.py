@@ -34,6 +34,25 @@ PLANS = {
     }
 }
 
+# Дополнительные пакеты токенов для ИИ
+TOKEN_PACKS = {
+    'tokens_25k': {
+        'price': 99,
+        'tokens': 25000,
+        'name': '+25,000 токенов (~32,000 слов)'
+    },
+    'tokens_50k': {
+        'price': 179,
+        'tokens': 50000,
+        'name': '+50,000 токенов (~65,000 слов)'
+    },
+    'tokens_100k': {
+        'price': 299,
+        'tokens': 100000,
+        'name': '+100,000 токенов (~130,000 слов)'
+    }
+}
+
 def verify_token(token: str) -> dict:
     """Проверяет JWT токен и возвращает payload"""
     if token == 'mock-token':
@@ -124,11 +143,21 @@ def check_tinkoff_payment(payment_id: str) -> dict:
 
 def create_payment(conn, user_id: int, plan_type: str) -> dict:
     """Создает запись о платеже и инициирует оплату в Т-кассе"""
-    if plan_type not in PLANS:
+    # Проверяем, это подписка или пакет токенов
+    is_token_pack = plan_type in TOKEN_PACKS
+    is_subscription = plan_type in PLANS
+    
+    if not is_token_pack and not is_subscription:
         return None
     
-    plan = PLANS[plan_type]
-    expires_at = datetime.now() + timedelta(days=plan['duration_days'])
+    if is_subscription:
+        plan = PLANS[plan_type]
+        expires_at = datetime.now() + timedelta(days=plan['duration_days'])
+        description = f"Studyfay подписка: {plan['name']}"
+    else:
+        plan = TOKEN_PACKS[plan_type]
+        expires_at = None
+        description = f"Studyfay доп. токены: {plan['name']}"
     
     with conn.cursor(cursor_factory=RealDictCursor) as cur:
         cur.execute(f"""
@@ -144,7 +173,6 @@ def create_payment(conn, user_id: int, plan_type: str) -> dict:
         
         # Создаем платеж в Т-кассе
         order_id = f"studyfay_{payment_dict['id']}"
-        description = f"Studyfay подписка: {plan['name']}"
         
         tinkoff_response = create_tinkoff_payment(
             user_id, 
@@ -175,7 +203,7 @@ def create_payment(conn, user_id: int, plan_type: str) -> dict:
         return payment_dict
 
 def complete_payment(conn, payment_id: int, payment_method: str = None, external_payment_id: str = None) -> bool:
-    """Завершает платеж и активирует подписку"""
+    """Завершает платеж и активирует подписку или добавляет токены"""
     with conn.cursor(cursor_factory=RealDictCursor) as cur:
         # Получаем информацию о платеже
         cur.execute(f"""
@@ -188,6 +216,9 @@ def complete_payment(conn, payment_id: int, payment_method: str = None, external
         if not payment:
             return False
         
+        plan_type = payment['plan_type']
+        is_token_pack = plan_type in TOKEN_PACKS
+        
         # Обновляем статус платежа
         cur.execute(f"""
             UPDATE {SCHEMA_NAME}.payments
@@ -198,14 +229,24 @@ def complete_payment(conn, payment_id: int, payment_method: str = None, external
             WHERE id = %s
         """, (payment_method, external_payment_id, payment_id))
         
-        # Активируем подписку
-        cur.execute(f"""
-            UPDATE {SCHEMA_NAME}.users
-            SET subscription_type = 'premium',
-                subscription_expires_at = %s,
-                updated_at = CURRENT_TIMESTAMP
-            WHERE id = %s
-        """, (payment['expires_at'], payment['user_id']))
+        if is_token_pack:
+            # Добавляем токены к текущему лимиту (не сбрасываем)
+            tokens_to_add = TOKEN_PACKS[plan_type]['tokens']
+            cur.execute(f"""
+                UPDATE {SCHEMA_NAME}.users
+                SET ai_tokens_limit = COALESCE(ai_tokens_limit, 50000) + %s,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE id = %s
+            """, (tokens_to_add, payment['user_id']))
+        else:
+            # Активируем подписку
+            cur.execute(f"""
+                UPDATE {SCHEMA_NAME}.users
+                SET subscription_type = 'premium',
+                    subscription_expires_at = %s,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE id = %s
+            """, (payment['expires_at'], payment['user_id']))
         
         conn.commit()
         return True
@@ -287,6 +328,24 @@ def handler(event: dict, context) -> dict:
                     'body': json.dumps({'plans': plans_list})
                 }
             
+            elif action == 'token_packs':
+                # Возвращаем доступные пакеты токенов
+                token_packs_list = [
+                    {
+                        'id': key,
+                        'name': pack['name'],
+                        'price': pack['price'],
+                        'tokens': pack['tokens']
+                    }
+                    for key, pack in TOKEN_PACKS.items()
+                ]
+                
+                return {
+                    'statusCode': 200,
+                    'headers': headers,
+                    'body': json.dumps({'token_packs': token_packs_list})
+                }
+            
             elif action == 'history':
                 # Возвращаем историю платежей
                 payments = get_user_payments(conn, user_id)
@@ -306,7 +365,7 @@ def handler(event: dict, context) -> dict:
                 
                 print(f"[PAYMENT] Создание платежа: user_id={user_id}, plan_type={plan_type}")
                 
-                if plan_type not in PLANS:
+                if plan_type not in PLANS and plan_type not in TOKEN_PACKS:
                     print(f"[PAYMENT] Ошибка: неверный plan_type={plan_type}")
                     return {
                         'statusCode': 400,

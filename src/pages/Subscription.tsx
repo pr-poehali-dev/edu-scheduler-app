@@ -17,6 +17,13 @@ interface Plan {
   duration_days: number;
 }
 
+interface TokenPack {
+  id: string;
+  name: string;
+  price: number;
+  tokens: number;
+}
+
 interface Payment {
   id: number;
   amount: number;
@@ -31,6 +38,7 @@ const Subscription = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [plans, setPlans] = useState<Plan[]>([]);
+  const [tokenPacks, setTokenPacks] = useState<TokenPack[]>([]);
   const [payments, setPayments] = useState<Payment[]>([]);
   const [subscriptionStatus, setSubscriptionStatus] = useState<any>(null);
   const [selectedPlan, setSelectedPlan] = useState<string | null>(null);
@@ -53,6 +61,7 @@ const Subscription = () => {
     try {
       await Promise.all([
         loadPlans(),
+        loadTokenPacks(),
         loadSubscriptionStatus(),
         loadPaymentHistory()
       ]);
@@ -73,6 +82,21 @@ const Subscription = () => {
       }
     } catch (error) {
       console.error('Failed to load plans:', error);
+    }
+  };
+
+  const loadTokenPacks = async () => {
+    try {
+      const token = authService.getToken();
+      const response = await fetch(`${PAYMENTS_URL}?action=token_packs`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setTokenPacks(data.token_packs);
+      }
+    } catch (error) {
+      console.error('Failed to load token packs:', error);
     }
   };
 
@@ -397,6 +421,59 @@ const Subscription = () => {
             })}
           </div>
         </div>
+
+        {/* Дополнительные пакеты токенов */}
+        {isPremium && tokenPacks.length > 0 && (
+          <div className="mb-12">
+            <h2 className="text-2xl font-bold text-gray-800 mb-2">Нужно больше запросов?</h2>
+            <p className="text-sm text-gray-600 mb-6">Докупите дополнительные токены для ИИ-ассистента</p>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {tokenPacks.map((pack) => {
+                const wordsCount = Math.round(pack.tokens * 1.3);
+                
+                return (
+                  <Card
+                    key={pack.id}
+                    className="p-6 bg-white border-2 border-blue-200 hover:shadow-xl transition-all"
+                  >
+                    <div className="text-center mb-4">
+                      <div className="w-12 h-12 bg-blue-500 rounded-xl flex items-center justify-center mx-auto mb-3">
+                        <Icon name="Zap" size={24} className="text-white" />
+                      </div>
+                      <h3 className="text-xl font-bold text-gray-800 mb-2">{pack.name}</h3>
+                      <div className="flex items-baseline justify-center gap-2">
+                        <span className="text-3xl font-bold text-blue-600">{pack.price}</span>
+                        <span className="text-gray-600">₽</span>
+                      </div>
+                      <p className="text-xs text-gray-500 mt-2">≈{wordsCount.toLocaleString('ru-RU')} слов</p>
+                    </div>
+
+                    <div className="bg-blue-50 rounded-lg p-3 mb-4">
+                      <p className="text-xs text-blue-900 text-center">
+                        Добавляется к текущему лимиту
+                      </p>
+                    </div>
+
+                    <Button
+                      onClick={() => handleBuySubscription(pack.id)}
+                      disabled={isProcessing}
+                      className="w-full bg-blue-600 hover:bg-blue-700 text-white rounded-xl"
+                    >
+                      {isProcessing && selectedPlan === pack.id ? (
+                        <>
+                          <Icon name="Loader2" size={20} className="mr-2 animate-spin" />
+                          Оформление...
+                        </>
+                      ) : (
+                        'Купить токены'
+                      )}
+                    </Button>
+                  </Card>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         {/* История платежей */}
         {payments.length > 0 && (

@@ -41,6 +41,7 @@ const Assistant = () => {
   const [question, setQuestion] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [showMaterials, setShowMaterials] = useState(false);
+  const [wordsRemaining, setWordsRemaining] = useState<number | null>(null);
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -109,6 +110,11 @@ const Assistant = () => {
             variant: 'destructive'
           });
           return;
+        }
+        
+        // Обновляем остаток слов
+        if (data.words_remaining !== undefined) {
+          setWordsRemaining(data.words_remaining);
         }
         
         const assistantMessage: Message = {
@@ -186,7 +192,11 @@ const Assistant = () => {
                 <h1 className="text-2xl font-heading font-bold bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 bg-clip-text text-transparent">
                   ИИ-Ассистент
                 </h1>
-                <p className="text-xs text-purple-600/70 font-medium">Задай вопрос по материалам</p>
+                {wordsRemaining !== null && (
+                  <p className="text-xs text-purple-600/70 font-medium">
+                    Осталось ~{wordsRemaining.toLocaleString('ru-RU')} слов в этом месяце
+                  </p>
+                )}
               </div>
             </div>
             <Button
