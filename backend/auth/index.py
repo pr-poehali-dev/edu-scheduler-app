@@ -138,7 +138,7 @@ def handler(event: dict, context) -> dict:
                             )
                             VALUES (
                                 %s, %s, %s, CURRENT_TIMESTAMP,
-                                CURRENT_TIMESTAMP + INTERVAL '7 days', FALSE,
+                                CURRENT_TIMESTAMP + INTERVAL '2 days', FALSE,
                                 50000, 0, CURRENT_TIMESTAMP + INTERVAL '1 month'
                             )
                             RETURNING id, email, full_name, university, faculty, course, trial_ends_at

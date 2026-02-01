@@ -352,7 +352,7 @@ const Subscription = () => {
                   </p>
                 </div>
               </div>
-              <Badge className="bg-blue-500 text-white text-lg px-4 py-2">7 дней</Badge>
+              <Badge className="bg-blue-500 text-white text-lg px-4 py-2">2 дня</Badge>
             </div>
           </Card>
         )}
