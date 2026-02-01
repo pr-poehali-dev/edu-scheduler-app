@@ -26,11 +26,12 @@ def verify_token(token: str) -> dict:
 
 
 def check_subscription_status(user_id: int, conn) -> dict:
-    """Проверяет статус подписки пользователя"""
+    """Проверяет статус подписки пользователя (включая триал период)"""
     with conn.cursor(cursor_factory=RealDictCursor) as cur:
         cur.execute("""
             SELECT subscription_type, subscription_expires_at,
-                   materials_quota_used, materials_quota_reset_at
+                   materials_quota_used, materials_quota_reset_at,
+                   trial_ends_at, is_trial_used
             FROM users
             WHERE id = %s
         """, (user_id,))
@@ -38,12 +39,17 @@ def check_subscription_status(user_id: int, conn) -> dict:
         user = cur.fetchone()
         
         if not user:
-            return {'is_premium': False, 'subscription_type': 'free'}
+            return {'is_premium': False, 'subscription_type': 'free', 'is_trial': False}
         
+        now = datetime.now()
         is_premium = False
+        is_trial = False
+        trial_ends_at = None
+        
+        # Проверяем премиум подписку
         if user['subscription_type'] == 'premium':
             if user['subscription_expires_at']:
-                if user['subscription_expires_at'] > datetime.now():
+                if user['subscription_expires_at'] > now:
                     is_premium = True
                 else:
                     cur.execute("""
@@ -54,6 +60,13 @@ def check_subscription_status(user_id: int, conn) -> dict:
                     conn.commit()
             else:
                 is_premium = True
+        
+        # Проверяем триал период (если нет активной премиум подписки)
+        if not is_premium and user.get('trial_ends_at') and not user.get('is_trial_used'):
+            trial_ends_naive = user['trial_ends_at'].replace(tzinfo=None) if user['trial_ends_at'].tzinfo else user['trial_ends_at']
+            if trial_ends_naive > now:
+                is_trial = True
+                trial_ends_at = user['trial_ends_at']
         
         if user['materials_quota_reset_at'] and user['materials_quota_reset_at'] < datetime.now():
             cur.execute("""
@@ -67,8 +80,10 @@ def check_subscription_status(user_id: int, conn) -> dict:
         
         return {
             'is_premium': is_premium,
+            'is_trial': is_trial,
             'subscription_type': user['subscription_type'],
             'subscription_expires_at': user['subscription_expires_at'].isoformat() if user['subscription_expires_at'] else None,
+            'trial_ends_at': trial_ends_at.isoformat() if trial_ends_at else None,
             'materials_quota_used': user['materials_quota_used'] or 0,
             'materials_quota_reset_at': user['materials_quota_reset_at'].isoformat() if user['materials_quota_reset_at'] else None
         }

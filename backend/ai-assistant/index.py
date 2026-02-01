@@ -27,11 +27,12 @@ def get_user_id_from_token(token: str) -> int:
         return None
 
 def check_subscription_access(conn, user_id: int) -> dict:
-    """Проверяет доступ пользователя к ИИ-ассистенту"""
+    """Проверяет доступ пользователя к ИИ-ассистенту (учитывает триал период)"""
     cursor = conn.cursor()
     cursor.execute(f'''
         SELECT subscription_type, subscription_expires_at, 
-               ai_tokens_used, ai_tokens_reset_at, ai_tokens_limit
+               ai_tokens_used, ai_tokens_reset_at, ai_tokens_limit,
+               trial_ends_at, is_trial_used
         FROM {SCHEMA_NAME}.users
         WHERE id = %s
     ''', (user_id,))
@@ -42,7 +43,7 @@ def check_subscription_access(conn, user_id: int) -> dict:
     if not row:
         return {'has_access': False, 'reason': 'user_not_found', 'tokens_used': 0, 'tokens_limit': 0}
     
-    sub_type, expires_at, tokens_used, reset_at, tokens_limit = row
+    sub_type, expires_at, tokens_used, reset_at, tokens_limit, trial_ends_at, is_trial_used = row
     now = datetime.now()
     
     # Если лимит не установлен, ставим по умолчанию 50000
@@ -79,15 +80,37 @@ def check_subscription_access(conn, user_id: int) -> dict:
             return {
                 'has_access': True, 
                 'is_premium': True,
+                'is_trial': False,
                 'tokens_used': tokens_used,
                 'tokens_limit': tokens_limit
             }
         else:
-            # Подписка истекла
-            return {'has_access': False, 'reason': 'subscription_expired', 'is_premium': False, 'tokens_used': tokens_used, 'tokens_limit': 0}
+            # Подписка истекла - проверяем триал
+            pass
+    
+    # Проверяем пробный период (7 дней)
+    if trial_ends_at and not is_trial_used and trial_ends_at > now:
+        if tokens_used >= tokens_limit:
+            return {
+                'has_access': False, 
+                'reason': 'tokens_limit_reached', 
+                'is_premium': False,
+                'is_trial': True,
+                'trial_ends_at': trial_ends_at,
+                'tokens_used': tokens_used,
+                'tokens_limit': tokens_limit
+            }
+        return {
+            'has_access': True, 
+            'is_premium': False,
+            'is_trial': True,
+            'trial_ends_at': trial_ends_at,
+            'tokens_used': tokens_used,
+            'tokens_limit': tokens_limit
+        }
     
     # Бесплатная версия - нет доступа
-    return {'has_access': False, 'reason': 'no_subscription', 'is_premium': False, 'tokens_used': 0, 'tokens_limit': 0}
+    return {'has_access': False, 'reason': 'no_subscription', 'is_premium': False, 'is_trial': False, 'tokens_used': 0, 'tokens_limit': 0}
 
 def increment_ai_tokens(conn, user_id: int, tokens_used: int):
     """Увеличивает счетчик использованных AI токенов"""

@@ -298,7 +298,9 @@ const Subscription = () => {
   }
 
   const isPremium = subscriptionStatus?.is_premium;
+  const isTrial = subscriptionStatus?.is_trial;
   const expiresAt = subscriptionStatus?.subscription_expires_at;
+  const trialEndsAt = subscriptionStatus?.trial_ends_at;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50">
@@ -326,6 +328,35 @@ const Subscription = () => {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Пробный период */}
+        {!isPremium && isTrial && trialEndsAt && (
+          <Card className="p-6 mb-8 bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-blue-300">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <div className="w-16 h-16 bg-blue-500 rounded-2xl flex items-center justify-center">
+                  <Icon name="Gift" size={32} className="text-white" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold text-gray-800 mb-1">🎁 Пробный период активен</h3>
+                  <p className="text-sm text-gray-600">
+                    Действует до {new Date(trialEndsAt).toLocaleDateString('ru-RU', {
+                      day: 'numeric',
+                      month: 'long',
+                      year: 'numeric',
+                      hour: '2-digit',
+                      minute: '2-digit'
+                    })}
+                  </p>
+                  <p className="text-xs text-blue-700 mt-1">
+                    Полный доступ ко всем функциям ИИ-ассистента, материалам и прогнозам экзаменов
+                  </p>
+                </div>
+              </div>
+              <Badge className="bg-blue-500 text-white text-lg px-4 py-2">7 дней</Badge>
+            </div>
+          </Card>
+        )}
+
         {/* Текущий статус подписки */}
         {isPremium && (
           <Card className="p-6 mb-8 bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-300">

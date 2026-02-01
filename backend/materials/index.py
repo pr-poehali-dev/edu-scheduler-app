@@ -33,17 +33,32 @@ def verify_token(token: str) -> dict:
 def check_subscription_access(conn, user_id: int) -> dict:
     schema = os.environ.get('MAIN_DB_SCHEMA', 'public')
     cursor = conn.cursor(cursor_factory=RealDictCursor)
-    cursor.execute(f'SELECT subscription_type, subscription_expires_at FROM {schema}.users WHERE id = %s', (user_id,))
+    cursor.execute(f'''
+        SELECT subscription_type, subscription_expires_at, trial_ends_at, is_trial_used 
+        FROM {schema}.users 
+        WHERE id = %s
+    ''', (user_id,))
     user = cursor.fetchone()
     cursor.close()
     
     if not user:
         return {'has_access': False, 'reason': 'user_not_found'}
     
+    now = datetime.now()
+    
+    # Проверяем премиум подписку
     if user.get('subscription_type') == 'premium':
-        if user.get('subscription_expires_at') and user['subscription_expires_at'].replace(tzinfo=None) > datetime.now():
-            return {'has_access': True, 'is_premium': True}
-        return {'has_access': False, 'reason': 'subscription_expired'}
+        if user.get('subscription_expires_at') and user['subscription_expires_at'].replace(tzinfo=None) > now:
+            return {'has_access': True, 'is_premium': True, 'is_trial': False}
+    
+    # Проверяем триал период
+    trial_ends = user.get('trial_ends_at')
+    is_trial_used = user.get('is_trial_used')
+    
+    if trial_ends and not is_trial_used:
+        trial_ends_naive = trial_ends.replace(tzinfo=None) if trial_ends.tzinfo else trial_ends
+        if trial_ends_naive > now:
+            return {'has_access': True, 'is_premium': False, 'is_trial': True, 'trial_ends_at': trial_ends}
     
     return {'has_access': False, 'reason': 'no_subscription'}
 

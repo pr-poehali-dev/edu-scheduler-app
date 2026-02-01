@@ -10,6 +10,7 @@ import Icon from '@/components/ui/icon';
 import { useToast } from '@/hooks/use-toast';
 
 const API_URL = 'https://functions.poehali.dev/177e7001-b074-41cb-9553-e9c715d36f09';
+const CHEAT_SHEET_URL = 'https://functions.poehali.dev/f87f21f9-9606-4c0f-8ffb-360ed66b2bb3';
 
 interface Material {
   id: number;
@@ -34,6 +35,8 @@ const Materials = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [filterSubject, setFilterSubject] = useState<string>('all');
   const [sortBy, setSortBy] = useState<string>('date');
+  const [cheatSheet, setCheatSheet] = useState<string | null>(null);
+  const [isGeneratingCheatSheet, setIsGeneratingCheatSheet] = useState(false);
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -239,6 +242,43 @@ const Materials = () => {
     }
   };
 
+  const handleGenerateCheatSheet = async (materialId: number) => {
+    setIsGeneratingCheatSheet(true);
+    setCheatSheet(null);
+
+    try {
+      const token = authService.getToken();
+      const response = await fetch(CHEAT_SHEET_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ material_id: materialId })
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setCheatSheet(data.cheat_sheet);
+        toast({
+          title: "✅ Шпаргалка готова!",
+          description: "ИИ создал компактную шпаргалку для быстрого повторения"
+        });
+      } else {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Ошибка генерации');
+      }
+    } catch (error) {
+      toast({
+        title: "Ошибка",
+        description: error instanceof Error ? error.message : "Не удалось создать шпаргалку",
+        variant: "destructive"
+      });
+    } finally {
+      setIsGeneratingCheatSheet(false);
+    }
+  };
+
   const filteredMaterials = materials
     .filter(m => {
       if (filterSubject !== 'all' && m.subject !== filterSubject) return false;
@@ -322,13 +362,20 @@ const Materials = () => {
 
         {/* Фильтры и поиск */}
         <div className="flex flex-col sm:flex-row gap-4 mb-6">
-          <Input
-            placeholder="Поиск по материалам..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="flex-1 rounded-xl border-2 border-purple-200"
-            icon={<Icon name="Search" size={20} />}
-          />
+          <div className="flex-1 relative">
+            <Input
+              placeholder="Глобальный поиск по всем материалам..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="rounded-xl border-2 border-purple-200 pr-10"
+            />
+            <Icon name="Search" size={20} className="absolute right-3 top-1/2 -translate-y-1/2 text-purple-400" />
+            {searchQuery && (
+              <p className="text-xs text-purple-600 mt-1">
+                Поиск в названиях и содержимом всех документов
+              </p>
+            )}
+          </div>
           <Select value={filterSubject} onValueChange={setFilterSubject}>
             <SelectTrigger className="w-full sm:w-48 rounded-xl border-2 border-purple-200">
               <SelectValue placeholder="Предмет" />
@@ -420,7 +467,10 @@ const Materials = () => {
 
       {/* Модальное окно просмотра материала */}
       {selectedMaterial && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => setSelectedMaterial(null)}>
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => {
+          setSelectedMaterial(null);
+          setCheatSheet(null);
+        }}>
           <Card className="max-w-3xl w-full max-h-[80vh] overflow-y-auto bg-white" onClick={(e) => e.stopPropagation()}>
             <div className="sticky top-0 bg-white border-b border-gray-200 p-6 flex items-start justify-between">
               <div className="flex-1">
@@ -461,7 +511,39 @@ const Materials = () => {
                   </div>
                 </div>
               )}
-              <div className="mt-6 flex gap-3">
+              {/* Шпаргалка */}
+              {cheatSheet && (
+                <div className="mt-6 p-4 bg-green-50 border-2 border-green-200 rounded-xl">
+                  <h3 className="font-bold text-green-900 mb-2 flex items-center gap-2">
+                    <Icon name="FileCheck" size={20} />
+                    Шпаргалка для быстрого повторения
+                  </h3>
+                  <div className="prose prose-sm max-w-none">
+                    <pre className="whitespace-pre-wrap text-sm text-green-900 bg-white p-4 rounded-lg">
+                      {cheatSheet}
+                    </pre>
+                  </div>
+                </div>
+              )}
+              
+              <div className="mt-6 flex flex-wrap gap-3">
+                <Button
+                  onClick={() => handleGenerateCheatSheet(selectedMaterial.id)}
+                  disabled={isGeneratingCheatSheet}
+                  className="flex-1 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white rounded-xl"
+                >
+                  {isGeneratingCheatSheet ? (
+                    <>
+                      <Icon name="Loader2" size={20} className="mr-2 animate-spin" />
+                      Генерация...
+                    </>
+                  ) : (
+                    <>
+                      <Icon name="FileCheck" size={20} className="mr-2" />
+                      Шпаргалка
+                    </>
+                  )}
+                </Button>
                 <Button
                   onClick={() => {
                     navigate('/assistant');

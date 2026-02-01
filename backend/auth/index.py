@@ -131,9 +131,17 @@ def handler(event: dict, context) -> dict:
                         full_name = email.split('@')[0]  # Используем часть email как имя
                         
                         cur.execute("""
-                            INSERT INTO users (email, password_hash, full_name, last_login_at)
-                            VALUES (%s, %s, %s, CURRENT_TIMESTAMP)
-                            RETURNING id, email, full_name, university, faculty, course
+                            INSERT INTO users (
+                                email, password_hash, full_name, last_login_at,
+                                trial_ends_at, is_trial_used,
+                                ai_tokens_limit, ai_tokens_used, ai_tokens_reset_at
+                            )
+                            VALUES (
+                                %s, %s, %s, CURRENT_TIMESTAMP,
+                                CURRENT_TIMESTAMP + INTERVAL '7 days', FALSE,
+                                50000, 0, CURRENT_TIMESTAMP + INTERVAL '1 month'
+                            )
+                            RETURNING id, email, full_name, university, faculty, course, trial_ends_at
                         """, (email, password_hash, full_name))
                         
                         new_user = cur.fetchone()
@@ -154,8 +162,9 @@ def handler(event: dict, context) -> dict:
                                     'faculty': new_user['faculty'],
                                     'course': new_user['course']
                                 },
-                                'is_new_user': True
-                            })
+                                'is_new_user': True,
+                                'trial_ends_at': str(new_user['trial_ends_at'])
+                            }, default=str)
                         }
             finally:
                 conn.close()
