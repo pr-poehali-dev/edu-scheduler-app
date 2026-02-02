@@ -290,11 +290,13 @@ def handler(event: dict, context) -> dict:
                 try:
                     with conn.cursor(cursor_factory=RealDictCursor) as cur:
                         print(f"[MATERIALS] Начинаю INSERT materials для user_id={user_id}...")
+                        # Для больших документов храним только чанки, для маленьких - весь текст
+                        text_preview = full_text[:2000] if len(chunks) > 1 else full_text[:10000]
                         cur.execute("""
                             INSERT INTO materials (user_id, title, subject, file_url, recognized_text, summary, file_type, file_size, total_chunks)
                             VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
                             RETURNING id, title, subject, file_url, summary, file_type, file_size, total_chunks, created_at
-                        """, (user_id, title, subject, cdn_url, full_text[:10000], summary, file_type_short, file_size, len(chunks)))
+                        """, (user_id, title, subject, cdn_url, text_preview, summary, file_type_short, file_size, len(chunks)))
                         print(f"[MATERIALS] INSERT materials OK")
                         
                         material = cur.fetchone()
@@ -308,7 +310,7 @@ def handler(event: dict, context) -> dict:
                         conn.commit()
                         print(f"[MATERIALS] COMMIT OK, материал ID={material_id} создан")
                         
-                        return {'statusCode': 200, 'headers': headers, 'body': json.dumps({'material': dict(material), 'chunks_created': len(chunks)})}
+                        return {'statusCode': 200, 'headers': headers, 'body': json.dumps({'material': dict(material), 'chunks_created': len(chunks)}, default=str)}
                 except Exception as db_error:
                     print(f"[MATERIALS] ⚠️ Ошибка БД: {type(db_error).__name__}: {db_error}")
                     import traceback
@@ -391,11 +393,13 @@ def handler(event: dict, context) -> dict:
                 conn = get_db_connection()
                 try:
                     with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                        # Для больших документов храним только чанки, для маленьких - весь текст
+                        text_preview = full_text[:2000] if len(chunks) > 1 else full_text[:10000]
                         cur.execute("""
                             INSERT INTO materials (user_id, title, subject, file_url, recognized_text, summary, file_type, file_size, total_chunks)
                             VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
                             RETURNING id, title, subject, file_url, summary, file_type, file_size, total_chunks, created_at
-                        """, (user_id, title, subject, cdn_url, full_text[:10000], summary, file_type_short, file_size, len(chunks)))
+                        """, (user_id, title, subject, cdn_url, text_preview, summary, file_type_short, file_size, len(chunks)))
                         
                         material = cur.fetchone()
                         material_id = material['id']

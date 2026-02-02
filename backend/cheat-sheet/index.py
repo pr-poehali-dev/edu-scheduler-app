@@ -93,7 +93,15 @@ def generate_cheat_sheet(material_data: dict) -> str:
         return response.choices[0].message.content
     except Exception as e:
         print(f"[CHEAT-SHEET] Ошибка DeepSeek: {e}")
-        return f"Ошибка генерации: {str(e)}"
+        error_str = str(e)
+        
+        # Человекопонятное сообщение об ошибке
+        if 'Insufficient Balance' in error_str or '402' in error_str:
+            return "⚠️ Шпаргалка временно недоступна: закончился баланс DeepSeek API. Попробуйте позже или обратитесь к администратору."
+        elif 'timeout' in error_str.lower():
+            return "⏱️ Превышено время ожидания. Попробуйте с более коротким материалом."
+        else:
+            return f"❌ Ошибка генерации шпаргалки: {error_str[:200]}"
 
 
 def handler(event: dict, context) -> dict:
