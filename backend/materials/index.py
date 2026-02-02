@@ -278,6 +278,7 @@ def handler(event: dict, context) -> dict:
                 title = (analysis.get('title') or filename)[:200]
                 subject = (analysis.get('subject') or 'Общее')[:100]
                 summary = (analysis.get('summary') or 'Документ загружен')[:2000]
+                file_type_short = file_type[:50]
                 
                 conn = get_db_connection()
                 try:
@@ -286,7 +287,7 @@ def handler(event: dict, context) -> dict:
                             INSERT INTO materials (user_id, title, subject, file_url, recognized_text, summary, file_type, file_size, total_chunks)
                             VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
                             RETURNING id, title, subject, file_url, summary, file_type, file_size, total_chunks, created_at
-                        """, (user_id, title, subject, cdn_url, full_text[:10000], summary, file_type, file_size, len(chunks)))
+                        """, (user_id, title, subject, cdn_url, full_text[:10000], summary, file_type_short, file_size, len(chunks)))
                         
                         material = cur.fetchone()
                         material_id = material['id']
@@ -370,6 +371,7 @@ def handler(event: dict, context) -> dict:
                 title = (analysis.get('title') or filename)[:200]
                 subject = (analysis.get('subject') or 'Общее')[:100]
                 summary = (analysis.get('summary') or 'Документ загружен')[:2000]
+                file_type_short = file_type[:50]
                 
                 conn = get_db_connection()
                 try:
@@ -378,7 +380,7 @@ def handler(event: dict, context) -> dict:
                             INSERT INTO materials (user_id, title, subject, file_url, recognized_text, summary, file_type, file_size, total_chunks)
                             VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
                             RETURNING id, title, subject, file_url, summary, file_type, file_size, total_chunks, created_at
-                        """, (user_id, title, subject, cdn_url, full_text[:10000], summary, file_type, file_size, len(chunks)))
+                        """, (user_id, title, subject, cdn_url, full_text[:10000], summary, file_type_short, file_size, len(chunks)))
                         
                         material = cur.fetchone()
                         material_id = material['id']
