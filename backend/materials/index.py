@@ -221,8 +221,85 @@ def handler(event: dict, context) -> dict:
         body = json.loads(event.get('body', '{}'))
         action = body.get('action')
         
-        # Шаг 1: получить presigned URL
-        if action == 'get_upload_url':
+        # Прямая загрузка файла через base64 (обход CORS проблем)
+        if action == 'upload_direct':
+            try:
+                conn = get_db_connection()
+                access = check_subscription_access(conn, user_id)
+                conn.close()
+                
+                if not access['has_access']:
+                    message = '⏰ Подписка истекла' if access.get('reason') == 'subscription_expired' else '🔒 Требуется подписка'
+                    return {'statusCode': 403, 'headers': headers, 'body': json.dumps({'error': 'subscription_required', 'message': message})}
+                
+                filename = body.get('filename')
+                file_type = body.get('fileType')
+                file_data_base64 = body.get('fileData')
+                
+                if not filename or not file_type or not file_data_base64:
+                    return {'statusCode': 400, 'headers': headers, 'body': json.dumps({'error': 'Не указаны filename, fileType или fileData'})}
+                
+                import base64
+                file_data = base64.b64decode(file_data_base64)
+                file_size = len(file_data)
+                
+                if file_size > MAX_FILE_SIZE:
+                    return {'statusCode': 400, 'headers': headers, 'body': json.dumps({'error': f'Макс размер: {MAX_FILE_SIZE // 1024 // 1024} МБ'})}
+                
+                print(f"[MATERIALS] Загрузка {filename}, размер={file_size} байт")
+                
+                # Загружаем в S3
+                s3 = get_s3_client()
+                timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+                import random
+                file_key = f"materials/{user_id}_{timestamp}_{random.randint(10000000, 99999999)}_{filename}"
+                
+                s3.put_object(Bucket='files', Key=file_key, Body=file_data, ContentType=file_type)
+                cdn_url = f"https://cdn.poehali.dev/projects/{os.environ['AWS_ACCESS_KEY_ID']}/bucket/{file_key}"
+                
+                print(f"[MATERIALS] Файл загружен в S3: {file_key}")
+                
+                # Обрабатываем сразу
+                print(f"[MATERIALS] Извлекаю текст, тип файла: {file_type}")
+                full_text = extract_text_from_file(file_data, file_type)
+                
+                if not full_text or len(full_text.strip()) < 10:
+                    return {'statusCode': 400, 'headers': headers, 'body': json.dumps({'error': 'Файл пуст или не содержит распознаваемого текста'})}
+                
+                print(f"[MATERIALS] Извлечено {len(full_text)} символов текста")
+                
+                chunks = split_text_into_chunks(full_text)
+                analysis = analyze_document_with_deepseek(full_text, filename)
+                
+                conn = get_db_connection()
+                try:
+                    with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                        cur.execute("""
+                            INSERT INTO materials (user_id, title, subject, file_url, recognized_text, summary, file_type, file_size, total_chunks)
+                            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                            RETURNING id, title, subject, file_url, summary, file_type, file_size, total_chunks, created_at
+                        """, (user_id, analysis.get('title', filename[:50]), analysis.get('subject'), cdn_url, full_text[:10000], analysis.get('summary'), file_type, file_size, len(chunks)))
+                        
+                        material = cur.fetchone()
+                        material_id = material['id']
+                        
+                        for idx, chunk in enumerate(chunks):
+                            cur.execute("INSERT INTO document_chunks (material_id, chunk_index, chunk_text) VALUES (%s, %s, %s)", (material_id, idx, chunk))
+                        
+                        conn.commit()
+                        print(f"[MATERIALS] Материал создан: ID={material_id}, {len(chunks)} чанков")
+                        
+                        return {'statusCode': 200, 'headers': headers, 'body': json.dumps({'material': dict(material), 'chunks_created': len(chunks)})}
+                finally:
+                    conn.close()
+            except Exception as e:
+                print(f"[MATERIALS] Ошибка upload_direct: {e}")
+                import traceback
+                traceback.print_exc()
+                return {'statusCode': 500, 'headers': headers, 'body': json.dumps({'error': str(e)})}
+        
+        # Шаг 1: получить presigned URL (старый метод, оставляем для совместимости)
+        elif action == 'get_upload_url':
             try:
                 conn = get_db_connection()
                 access = check_subscription_access(conn, user_id)

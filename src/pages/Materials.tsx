@@ -109,23 +109,47 @@ const Materials = () => {
     try {
       const token = authService.getToken();
       
-      // Шаг 1: Получаем presigned URL
-      const urlResponse = await fetch(API_URL, {
+      toast({
+        title: "📤 Загрузка файла...",
+        description: "Конвертируем и отправляем на сервер"
+      });
+
+      // Конвертируем файл в base64
+      const reader = new FileReader();
+      const fileDataPromise = new Promise<string>((resolve, reject) => {
+        reader.onload = () => {
+          const result = reader.result as string;
+          const base64Data = result.split(',')[1];
+          resolve(base64Data);
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+
+      const fileData = await fileDataPromise;
+
+      toast({
+        title: "🤖 Обработка ИИ...",
+        description: "Извлекаем текст и анализируем документ"
+      });
+
+      // Отправляем файл на backend
+      const response = await fetch(API_URL, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify({
-          action: 'get_upload_url',
+          action: 'upload_direct',
           filename: file.name,
           fileType: file.type || 'application/octet-stream',
-          fileSize: file.size
+          fileData: fileData
         })
       });
 
-      if (urlResponse.status === 403) {
-        const errorData = await urlResponse.json();
+      if (response.status === 403) {
+        const errorData = await response.json();
         toast({
           title: 'Требуется подписка',
           description: errorData.message || 'Загрузка доступна только по подписке',
@@ -136,71 +160,17 @@ const Materials = () => {
         return;
       }
 
-      if (!urlResponse.ok) {
-        const errorData = await urlResponse.json();
-        throw new Error(errorData.error || 'Не удалось получить URL для загрузки');
-      }
-
-      const { upload_url, file_key, cdn_url } = await urlResponse.json();
-
-      // Шаг 2: Загружаем файл напрямую в S3
-      toast({
-        title: "📤 Загрузка файла...",
-        description: "Это может занять время для больших файлов"
-      });
-
-      const uploadResponse = await fetch(upload_url, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': file.type || 'application/octet-stream'
-        },
-        body: file
-      });
-
-      if (!uploadResponse.ok) {
-        throw new Error('Не удалось загрузить файл в S3');
-      }
-
-      // Шаг 3: Сообщаем backend обработать файл
-      toast({
-        title: "🤖 Обработка ИИ...",
-        description: "Извлекаем текст и анализируем документ"
-      });
-
-      const processResponse = await fetch(API_URL, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          action: 'process_file',
-          fileKey: file_key,
-          cdnUrl: cdn_url,
-          filename: file.name,
-          fileType: file.type || 'application/octet-stream',
-          fileSize: file.size
-        })
-      });
-
-      if (processResponse.ok) {
-        const data = await processResponse.json();
+      if (response.ok) {
+        const data = await response.json();
         
         toast({
           title: "✅ Файл обработан!",
           description: `Создан материал: ${data.material.title}`,
         });
 
-        if (data.tasks && data.tasks.length > 0) {
-          toast({
-            title: "📋 Найдены задачи!",
-            description: `Обнаружено ${data.tasks.length} задач(и)`,
-          });
-        }
-
         await loadMaterials();
       } else {
-        const errorData = await processResponse.json();
+        const errorData = await response.json();
         throw new Error(errorData.error || 'Ошибка обработки файла');
       }
 
