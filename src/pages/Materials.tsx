@@ -324,7 +324,7 @@ const Materials = () => {
             <div>
               <p className="text-sm text-blue-900 font-medium mb-1">Поддерживаемые форматы</p>
               <p className="text-xs text-blue-700">
-                Word (.docx), Excel (.xlsx, .xls), PDF — до 10 МБ. ИИ автоматически извлечёт текст и создаст краткое резюме.
+                Word (.docx), Excel (.xlsx, .xls), PDF — до 50 МБ. ИИ автоматически извлечёт текст и создаст краткое резюме.
               </p>
             </div>
           </div>
