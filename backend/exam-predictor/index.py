@@ -144,7 +144,14 @@ def analyze_materials_with_deepseek(materials: list, past_exams: str = None) -> 
         return result
     except Exception as e:
         print(f"[EXAM-PREDICTOR] Ошибка DeepSeek: {e}")
-        raise Exception(f"Не удалось сгенерировать прогноз: {str(e)[:200]}")
+        error_str = str(e)
+        
+        if 'Insufficient Balance' in error_str or '402' in error_str:
+            raise Exception("⚠️ AI-прогноз временно недоступен: закончился баланс DeepSeek API. Функция будет восстановлена в ближайшее время.")
+        elif 'timeout' in error_str.lower():
+            raise Exception("⏱️ Превышено время ожидания. Попробуйте с меньшим количеством материалов.")
+        else:
+            raise Exception(f"Не удалось сгенерировать прогноз: {error_str[:150]}")
 
 
 def handler(event: dict, context) -> dict:
