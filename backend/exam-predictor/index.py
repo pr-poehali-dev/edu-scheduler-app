@@ -6,6 +6,7 @@ import psycopg2
 from psycopg2.extras import RealDictCursor
 import jwt
 from openai import OpenAI
+from datetime import datetime
 
 
 def get_db_connection():
@@ -23,6 +24,38 @@ def verify_token(token: str) -> dict:
         return jwt.decode(token, secret, algorithms=['HS256'])
     except:
         return None
+
+
+def check_premium_access(conn, user_id: int) -> dict:
+    """Проверяет доступ к премиум функциям (включая триал)"""
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
+    cursor.execute('''
+        SELECT subscription_type, subscription_expires_at, trial_ends_at, is_trial_used
+        FROM users
+        WHERE id = %s
+    ''', (user_id,))
+    
+    user = cursor.fetchone()
+    cursor.close()
+    
+    if not user:
+        return {'has_access': False, 'reason': 'user_not_found'}
+    
+    now = datetime.now()
+    
+    # Проверяем премиум
+    if user.get('subscription_type') == 'premium':
+        expires = user.get('subscription_expires_at')
+        if expires and expires.replace(tzinfo=None) > now:
+            return {'has_access': True, 'is_premium': True, 'is_trial': False}
+    
+    # Проверяем триал
+    trial_ends = user.get('trial_ends_at')
+    if trial_ends and not user.get('is_trial_used'):
+        if trial_ends.replace(tzinfo=None) > now:
+            return {'has_access': True, 'is_premium': False, 'is_trial': True}
+    
+    return {'has_access': False, 'reason': 'no_premium'}
 
 
 def analyze_materials_with_deepseek(materials: list, past_exams: str = None) -> dict:
@@ -90,16 +123,21 @@ def analyze_materials_with_deepseek(materials: list, past_exams: str = None) -> 
 }}
 """
     
-    response = client.chat.completions.create(
-        model="deepseek-chat",
-        messages=[{"role": "user", "content": prompt}],
-        max_tokens=4000,
-        temperature=0.7,
-        response_format={"type": "json_object"}
-    )
-    
-    result = json.loads(response.choices[0].message.content)
-    return result
+    try:
+        response = client.chat.completions.create(
+            model="deepseek-chat",
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=4000,
+            temperature=0.7,
+            response_format={"type": "json_object"},
+            timeout=60.0
+        )
+        
+        result = json.loads(response.choices[0].message.content)
+        return result
+    except Exception as e:
+        print(f"[EXAM-PREDICTOR] Ошибка DeepSeek: {e}")
+        raise Exception(f"Не удалось сгенерировать прогноз: {str(e)[:200]}")
 
 
 def handler(event: dict, context) -> dict:
@@ -158,6 +196,15 @@ def handler(event: dict, context) -> dict:
         
         conn = get_db_connection()
         try:
+            # Проверяем премиум доступ
+            access = check_premium_access(conn, user_id)
+            if not access['has_access']:
+                return {
+                    'statusCode': 403,
+                    'headers': headers,
+                    'body': json.dumps({'error': '🔒 AI-прогноз экзаменов доступен только в Premium подписке'})
+                }
+            
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
                 # Получаем материалы студента
                 cur.execute("""
@@ -176,10 +223,18 @@ def handler(event: dict, context) -> dict:
                     }
                 
                 # Анализируем материалы через DeepSeek
-                prediction = analyze_materials_with_deepseek(
-                    [dict(m) for m in materials],
-                    past_exams if past_exams else None
-                )
+                try:
+                    prediction = analyze_materials_with_deepseek(
+                        [dict(m) for m in materials],
+                        past_exams if past_exams else None
+                    )
+                except Exception as e:
+                    print(f"[EXAM-PREDICTOR] Ошибка анализа: {e}")
+                    return {
+                        'statusCode': 500,
+                        'headers': headers,
+                        'body': json.dumps({'error': f'Ошибка генерации прогноза: {str(e)[:200]}'})
+                    }
                 
                 # Сохраняем прогноз в БД
                 cur.execute("""
@@ -207,6 +262,15 @@ def handler(event: dict, context) -> dict:
                         'created_at': str(saved['created_at'])
                     }, default=str)
                 }
+        except Exception as e:
+            print(f"[EXAM-PREDICTOR] Общая ошибка: {e}")
+            import traceback
+            traceback.print_exc()
+            return {
+                'statusCode': 500,
+                'headers': headers,
+                'body': json.dumps({'error': f'Ошибка сервера: {str(e)[:200]}'})
+            }
         finally:
             conn.close()
     
